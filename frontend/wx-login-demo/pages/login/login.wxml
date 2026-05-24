@@ -1,0 +1,26 @@
+<view class="page">
+  <view class="section">
+    <view class="title">wx.login 调试</view>
+    <view class="desc">先获取 code，再请求本地后端换取 token。</view>
+  </view>
+
+  <view class="section">
+    <button type="primary" bindtap="getCode">获取 wx.login code</button>
+    <button class="secondary" bindtap="loginBackend" disabled="{{!code}}">请求后端 /auth/wechat-login</button>
+  </view>
+
+  <view class="section">
+    <view class="label">当前 code</view>
+    <textarea class="output" value="{{code}}" disabled auto-height />
+  </view>
+
+  <view class="section">
+    <view class="label">后端返回 token</view>
+    <textarea class="output" value="{{token}}" disabled auto-height />
+  </view>
+
+  <view class="section">
+    <view class="label">响应/错误信息</view>
+    <textarea class="output" value="{{message}}" disabled auto-height />
+  </view>
+</view>

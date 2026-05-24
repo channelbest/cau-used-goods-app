@@ -1,0 +1,48 @@
+.page {
+  padding: 24rpx;
+}
+
+.section {
+  margin-bottom: 28rpx;
+}
+
+.title {
+  font-size: 40rpx;
+  font-weight: 600;
+  margin-bottom: 12rpx;
+}
+
+.desc {
+  color: #64748b;
+  font-size: 28rpx;
+}
+
+button {
+  margin-bottom: 20rpx;
+}
+
+.secondary {
+  background: #ffffff;
+  color: #1f2937;
+  border: 1px solid #d1d5db;
+}
+
+.label {
+  color: #374151;
+  font-size: 28rpx;
+  font-weight: 500;
+  margin-bottom: 10rpx;
+}
+
+.output {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 120rpx;
+  padding: 20rpx;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8rpx;
+  color: #111827;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
