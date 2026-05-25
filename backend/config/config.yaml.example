@@ -1,0 +1,24 @@
+server:
+  env: dev
+  port: 8080
+
+jwt:
+  secret: change_this_to_a_long_random_secret
+  expire_hours: 168
+
+wechat:
+  app_id: your_wechat_mini_program_app_id
+  app_secret: your_wechat_mini_program_app_secret
+
+database:
+  host: 127.0.0.1
+  port: 3306
+  user: root
+  password: your_mysql_password
+  name: cau_used_goods
+  charset: utf8mb4
+  parse_time: true
+  loc: Local
+  max_open_conns: 25
+  max_idle_conns: 10
+  conn_max_lifetime_minutes: 30

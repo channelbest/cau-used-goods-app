@@ -1,0 +1,11 @@
+{
+  "pages": [
+    "pages/login/login"
+  ],
+  "window": {
+    "navigationBarTitleText": "微信登录测试",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f6f7f9"
+  }
+}
