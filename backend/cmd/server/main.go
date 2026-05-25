@@ -10,7 +10,11 @@ import (
 	"cau-used-goods-app/backend/internal/auth"
 	"cau-used-goods-app/backend/internal/config"
 	"cau-used-goods-app/backend/internal/db"
+	"cau-used-goods-app/backend/internal/favorite"
 	"cau-used-goods-app/backend/internal/middleware"
+	"cau-used-goods-app/backend/internal/order"
+	"cau-used-goods-app/backend/internal/report"
+	"cau-used-goods-app/backend/internal/review"
 	"cau-used-goods-app/backend/internal/user"
 )
 
@@ -44,14 +48,35 @@ func main() {
 	userService := user.NewService(userRepo)
 	userHandler := user.NewHandler(userService)
 
+	orderRepo := order.NewRepository(db.DB())
+	orderService := order.NewService(orderRepo)
+	orderHandler := order.NewHandler(orderService)
+
+	favoriteRepo := favorite.NewRepository(db.DB())
+	favoriteService := favorite.NewService(favoriteRepo)
+	favoriteHandler := favorite.NewHandler(favoriteService)
+
+	reviewRepo := review.NewRepository(db.DB())
+	reviewService := review.NewService(reviewRepo)
+	reviewHandler := review.NewHandler(reviewService)
+
+	reportRepo := report.NewRepository(db.DB())
+	reportService := report.NewService(reportRepo)
+	reportHandler := report.NewHandler(reportService)
+
 	r := gin.Default()
 	r.Static("/uploads", "./uploads")
 
 	authMiddleware := middleware.Auth(cfg.JWT.Secret)
+	verifiedMiddleware := middleware.Verified(db.DB())
 
 	auth.RegisterRoutes(r, authHandler, authMiddleware, cfg.Server.Env == "dev")
 	user.RegisterRoutes(r, userHandler, authMiddleware)
 	user.RegisterAdminRoutes(r, userHandler, authMiddleware, middleware.Admin())
+	order.RegisterRoutes(r, orderHandler, authMiddleware, verifiedMiddleware)
+	favorite.RegisterRoutes(r, favoriteHandler, authMiddleware, verifiedMiddleware)
+	review.RegisterRoutes(r, reviewHandler, authMiddleware, verifiedMiddleware)
+	report.RegisterRoutes(r, reportHandler, authMiddleware, verifiedMiddleware)
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	log.Printf("server listening on %s", addr)
