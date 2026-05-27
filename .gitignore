@@ -1,3 +1,4 @@
 backend/config/config.yaml
 backend/*.exe
 backend/*.test
+frontend/cau-used-goods-uni/unpackage/dist/dev/.sourcemap/
