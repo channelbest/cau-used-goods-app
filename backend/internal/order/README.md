@@ -19,7 +19,8 @@ PENDING_CONFIRM（待确认）
 
 WAIT_MEET（待见面）
     ├── 卖家完成 → COMPLETED（已完成）
-    └── 买家/卖家取消 → CANCELED（已取消）
+    ├── 买家/卖家取消 → CANCELED（已取消）
+    └── 买家/卖家异常关闭 → EXCEPTION_CLOSED（异常关闭）
 ```
 
 ## 核心规则
@@ -40,6 +41,7 @@ WAIT_MEET（待见面）
 | POST | `/orders/:id/confirm` | 卖家确认订单 | 登录+认证（卖家）|
 | POST | `/orders/:id/cancel` | 取消订单 | 登录+认证（买卖双方）|
 | POST | `/orders/:id/complete` | 完成订单 | 登录+认证（卖家）|
+| POST | `/orders/:id/exception-close` | 异常关闭订单 | 登录+认证（买卖双方）|
 | POST | `/admin/orders/cleanup-expired` | 清理超时订单 | 登录+认证 |
 
 ## 权限校验
@@ -56,7 +58,7 @@ WAIT_MEET（待见面）
 | 重复预约同一商品 | "you already have an active order for this product" |
 | 商品已被锁定/售出 | "product not available" |
 | 非卖家确认订单 | "permission denied" |
-| 订单状态不允许操作 | "order cannot be confirmed/cancelled/completed" |
+| 订单状态不允许操作 | "order cannot be confirmed/cancelled/completed/exception closed" |
 | 订单不存在 | "order not found" |
 
 ## 并发控制
@@ -74,7 +76,15 @@ UPDATE products SET status = 'LOCKED' WHERE id = ? AND status = 'ON_SALE'
 - 事务处理要求一致
 - 并发控制方案一致
 
+## 异常关闭
+
+异常关闭用于交易过程中出现特殊情况（如商品损坏、卖家无法履约等），由买卖双方主动发起。
+
+- 仅在 `PENDING_CONFIRM` 或 `WAIT_MEET` 状态下可异常关闭
+- 异常关闭后商品恢复为 `ON_SALE` 状态
+- 需要填写关闭原因
+
 ## 仍需讨论的问题
 
-- 超时自动取消目前是手动触发接口，是否需要定时任务？
 - 订单完成后是否需要自动发送消息通知？
+- 异常关闭是否需要管理员审核？

@@ -7,14 +7,16 @@ import (
 	"time"
 
 	"cau-used-goods-app/backend/internal/db"
+	"cau-used-goods-app/backend/internal/product"
 )
 
 type Service struct {
-	repo *Repository
+	repo    *Repository
+	product *product.Service
 }
 
-func NewService(repo *Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo *Repository, productService *product.Service) *Service {
+	return &Service{repo: repo, product: productService}
 }
 
 type CreateOrderInput struct {
@@ -66,7 +68,7 @@ func (s *Service) Create(ctx context.Context, input CreateOrderInput) (*Order, e
 	}
 
 	err = db.WithTx(ctx, func(tx *sql.Tx) error {
-		if err := s.repo.LockProduct(ctx, tx, input.ProductID); err != nil {
+		if err := s.product.LockProduct(ctx, input.ProductID); err != nil {
 			return err
 		}
 		if err := s.repo.Create(ctx, tx, order); err != nil {
@@ -135,7 +137,7 @@ func (s *Service) Cancel(ctx context.Context, input CancelOrderInput) (*Order, e
 
 	now := time.Now().Format("2006-01-02 15:04:05")
 	err = db.WithTx(ctx, func(tx *sql.Tx) error {
-		if err := s.repo.UnlockProduct(ctx, tx, order.ProductID); err != nil {
+		if err := s.product.UnlockProduct(ctx, order.ProductID); err != nil {
 			return err
 		}
 		if err := s.repo.UpdateStatus(ctx, tx, input.OrderID, "CANCELED", map[string]interface{}{
@@ -159,6 +161,12 @@ type CompleteOrderInput struct {
 	SellerID uint64
 }
 
+type ExceptionCloseOrderInput struct {
+	OrderID uint64
+	UserID  uint64
+	Reason  string
+}
+
 func (s *Service) Complete(ctx context.Context, input CompleteOrderInput) (*Order, error) {
 	order, err := s.repo.GetByID(ctx, input.OrderID)
 	if err != nil {
@@ -176,11 +184,47 @@ func (s *Service) Complete(ctx context.Context, input CompleteOrderInput) (*Orde
 
 	now := time.Now().Format("2006-01-02 15:04:05")
 	err = db.WithTx(ctx, func(tx *sql.Tx) error {
-		if err := s.repo.MarkProductSold(ctx, tx, order.ProductID); err != nil {
+		if err := s.product.MarkProductSold(ctx, order.ProductID); err != nil {
 			return err
 		}
 		if err := s.repo.UpdateStatus(ctx, tx, input.OrderID, "COMPLETED", map[string]interface{}{
 			"finish_time": now,
+		}); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return s.repo.GetByID(ctx, input.OrderID)
+}
+
+func (s *Service) ExceptionClose(ctx context.Context, input ExceptionCloseOrderInput) (*Order, error) {
+	order, err := s.repo.GetByID(ctx, input.OrderID)
+	if err != nil {
+		return nil, err
+	}
+	if order == nil {
+		return nil, fmt.Errorf("order not found")
+	}
+	if order.BuyerID != input.UserID && order.SellerID != input.UserID {
+		return nil, fmt.Errorf("permission denied")
+	}
+	if order.Status != "PENDING_CONFIRM" && order.Status != "WAIT_MEET" {
+		return nil, fmt.Errorf("order cannot be exception closed")
+	}
+
+	now := time.Now().Format("2006-01-02 15:04:05")
+	err = db.WithTx(ctx, func(tx *sql.Tx) error {
+		if err := s.product.UnlockProduct(ctx, order.ProductID); err != nil {
+			return err
+		}
+		if err := s.repo.UpdateStatus(ctx, tx, input.OrderID, "EXCEPTION_CLOSED", map[string]interface{}{
+			"cancel_reason": input.Reason,
+			"cancel_by":     input.UserID,
+			"close_time":    now,
 		}); err != nil {
 			return err
 		}
@@ -227,7 +271,7 @@ func (s *Service) CancelExpiredOrders(ctx context.Context) (int, error) {
 	now := time.Now().Format("2006-01-02 15:04:05")
 	for _, order := range orders {
 		err = db.WithTx(ctx, func(tx *sql.Tx) error {
-			if err := s.repo.UnlockProduct(ctx, tx, order.ProductID); err != nil {
+			if err := s.product.UnlockProduct(ctx, order.ProductID); err != nil {
 				return err
 			}
 			if err := s.repo.UpdateStatus(ctx, tx, order.ID, "CANCELED", map[string]interface{}{

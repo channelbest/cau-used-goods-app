@@ -135,6 +135,37 @@ func (h *Handler) Complete(c *gin.Context) {
 	response.Success(c, order)
 }
 
+func (h *Handler) ExceptionClose(c *gin.Context) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, response.CodeUnauthorized, "unauthorized")
+		return
+	}
+
+	orderID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || orderID == 0 {
+		response.Error(c, http.StatusBadRequest, response.CodeBadRequest, "invalid order id")
+		return
+	}
+
+	var req cancelOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, response.CodeBadRequest, "reason is required")
+		return
+	}
+
+	order, err := h.service.ExceptionClose(c.Request.Context(), ExceptionCloseOrderInput{
+		OrderID: orderID,
+		UserID:  userID,
+		Reason:  req.Reason,
+	})
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, response.CodeBadRequest, err.Error())
+		return
+	}
+	response.Success(c, order)
+}
+
 func (h *Handler) GetByID(c *gin.Context) {
 	userID, ok := middleware.CurrentUserID(c)
 	if !ok {
