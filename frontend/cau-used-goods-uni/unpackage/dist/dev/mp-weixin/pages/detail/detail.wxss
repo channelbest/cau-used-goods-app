@@ -1,0 +1,78 @@
+
+.page.data-v-eca06f3c {
+  min-height: 100vh;
+  padding: 32rpx;
+  padding-bottom: 140rpx;
+  background: #f6f7f9;
+  box-sizing: border-box;
+}
+.goods-image.data-v-eca06f3c {
+  height: 420rpx;
+  border-radius: 20rpx;
+  background: #d1d5db;
+}
+.info-card.data-v-eca06f3c {
+  margin-top: 24rpx;
+  padding: 28rpx;
+  border-radius: 16rpx;
+  background: #ffffff;
+}
+.title.data-v-eca06f3c {
+  font-size: 38rpx;
+  font-weight: 700;
+  color: #1f2933;
+}
+.price.data-v-eca06f3c {
+  margin-top: 20rpx;
+  font-size: 42rpx;
+  font-weight: 700;
+  color: #e11d48;
+}
+.meta.data-v-eca06f3c {
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  color: #6b7280;
+}
+.section-title.data-v-eca06f3c {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #1f2933;
+}
+.desc.data-v-eca06f3c {
+  margin-top: 16rpx;
+  line-height: 1.7;
+  font-size: 28rpx;
+  color: #374151;
+}
+.button-row.data-v-eca06f3c {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  gap: 16rpx;
+  padding: 20rpx 32rpx;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+.plain-button.data-v-eca06f3c,
+.main-button.data-v-eca06f3c,
+.danger-button.data-v-eca06f3c {
+  flex: 1;
+  height: 76rpx;
+  line-height: 76rpx;
+  border-radius: 12rpx;
+  font-size: 26rpx;
+}
+.plain-button.data-v-eca06f3c {
+  background: #f3f4f6;
+  color: #374151;
+}
+.main-button.data-v-eca06f3c {
+  background: #1aad19;
+  color: #ffffff;
+}
+.danger-button.data-v-eca06f3c {
+  background: #fee2e2;
+  color: #dc2626;
+}

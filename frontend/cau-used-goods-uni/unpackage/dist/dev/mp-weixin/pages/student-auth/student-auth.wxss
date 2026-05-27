@@ -1,0 +1,47 @@
+
+.page.data-v-34b2aeae {
+  min-height: 100vh;
+  padding: 48rpx;
+  background: #f6f7f9;
+  box-sizing: border-box;
+}
+.title.data-v-34b2aeae {
+  margin-bottom: 48rpx;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #1f2933;
+}
+.form-item.data-v-34b2aeae {
+  margin-bottom: 32rpx;
+}
+.label.data-v-34b2aeae {
+  display: block;
+  margin-bottom: 12rpx;
+  font-size: 28rpx;
+  color: #374151;
+}
+.input.data-v-34b2aeae {
+  height: 88rpx;
+  padding: 0 24rpx;
+  border-radius: 12rpx;
+  background: #ffffff;
+  font-size: 28rpx;
+}
+.submit-button.data-v-34b2aeae {
+  margin-top: 56rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 12rpx;
+  background: #1aad19;
+  color: #ffffff;
+  font-size: 32rpx;
+}
+.secondary-button.data-v-34b2aeae {
+  margin-top: 24rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 12rpx;
+  background: #ffffff;
+  color: #374151;
+  font-size: 30rpx;
+}

@@ -1,0 +1,45 @@
+
+.page.data-v-e4e4508d {
+  min-height: 100vh;
+  padding: 120rpx 48rpx;
+  background: #f6f7f9;
+  box-sizing: border-box;
+}
+.title.data-v-e4e4508d {
+  margin-top: 120rpx;
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #1f2933;
+  text-align: center;
+}
+.subtitle.data-v-e4e4508d {
+  margin-top: 24rpx;
+  font-size: 28rpx;
+  color: #6b7280;
+  text-align: center;
+}
+.login-button.data-v-e4e4508d {
+  margin-top: 120rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 12rpx;
+  background: #1aad19;
+  color: #ffffff;
+  font-size: 32rpx;
+}
+.secondary-button.data-v-e4e4508d {
+  margin-top: 24rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 12rpx;
+  background: #ffffff;
+  color: #374151;
+  font-size: 30rpx;
+}
+.tip.data-v-e4e4508d {
+  margin-top: 32rpx;
+  line-height: 1.6;
+  font-size: 24rpx;
+  color: #9ca3af;
+  text-align: center;
+}
