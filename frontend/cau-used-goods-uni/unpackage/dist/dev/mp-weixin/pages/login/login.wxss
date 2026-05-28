@@ -1,0 +1,44 @@
+.login-page {
+  min-height: 100vh;
+  padding: 72rpx 40rpx;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #eaf7ef 0%, #f6f7f9 42%, #f6f7f9 100%);
+}
+.brand-card {
+  padding-top: 80rpx;
+  text-align: center;
+}
+.brand-mark {
+  width: 112rpx;
+  height: 112rpx;
+  line-height: 112rpx;
+  margin: 0 auto 32rpx;
+  border-radius: 28rpx;
+  background: #16a34a;
+  color: #ffffff;
+  font-size: 34rpx;
+  font-weight: 800;
+}
+.brand-title {
+  font-size: 46rpx;
+  font-weight: 800;
+  color: #172033;
+}
+.login-panel {
+  margin-top: 96rpx;
+  padding: 40rpx 32rpx;
+  border-radius: 16rpx;
+  background: #ffffff;
+  box-shadow: 0 12rpx 36rpx rgba(15, 23, 42, 0.08);
+}
+.panel-title { font-size: 34rpx; font-weight: 700; color: #172033; text-align: center; }
+.login-button {
+  margin-top: 40rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 12rpx;
+  background: #16a34a;
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 700;
+}

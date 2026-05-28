@@ -1,0 +1,25 @@
+.page { min-height: 100vh; padding: 28rpx 28rpx 140rpx; background: #f5f6f8; box-sizing: border-box; }
+.empty { padding: 80rpx 0; color: #94a3b8; text-align: center; font-size: 28rpx; }
+.photo, .photo-img { width: 100%; height: 420rpx; border-radius: 16rpx; }
+.photo { line-height: 420rpx; background: #dbe4ea; color: #607080; text-align: center; font-size: 32rpx; font-weight: 700; }
+.card { margin-top: 22rpx; padding: 28rpx; border-radius: 16rpx; background: #ffffff; }
+.goods-title { font-size: 36rpx; font-weight: 800; color: #172033; }
+.price { margin-top: 18rpx; color: #e11d48; font-size: 42rpx; font-weight: 800; }
+.meta { margin-top: 14rpx; color: #64748b; font-size: 25rpx; }
+.section-title { font-size: 30rpx; font-weight: 800; color: #172033; }
+.desc { margin-top: 16rpx; line-height: 1.7; color: #475569; font-size: 26rpx; }
+.action-row { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 16rpx; padding: 18rpx 28rpx 34rpx; background: #ffffff; box-shadow: 0 -8rpx 24rpx rgba(15,23,42,0.06); }
+.action { flex: 1; height: 78rpx; line-height: 78rpx; border-radius: 12rpx; font-size: 26rpx; padding: 0; }
+.primary { background: #16a34a; color: #ffffff; }
+.secondary { background: #f1f5f9; color: #172033; }
+.warn { background: #fff1f2; color: #e11d48; }
+.mask { position: fixed; left: 0; right: 0; top: 0; bottom: 0; z-index: 10; display: flex; align-items: flex-end; background: rgba(15, 23, 42, 0.45); }
+.modal { width: 100%; padding: 32rpx 28rpx 48rpx; border-radius: 24rpx 24rpx 0 0; background: #ffffff; box-sizing: border-box; }
+.modal-title { margin-bottom: 24rpx; color: #172033; font-size: 32rpx; font-weight: 800; text-align: center; }
+.modal-input { height: 78rpx; margin-bottom: 18rpx; padding: 0 22rpx; border-radius: 12rpx; background: #f1f5f9; font-size: 26rpx; box-sizing: border-box; }
+.modal-textarea { width: 100%; height: 150rpx; margin-bottom: 24rpx; padding: 20rpx 22rpx; border-radius: 12rpx; background: #f1f5f9; font-size: 26rpx; box-sizing: border-box; }
+.modal-actions { display: flex; gap: 16rpx; }
+.modal-cancel, .modal-confirm { flex: 1; height: 78rpx; line-height: 78rpx; border-radius: 12rpx; font-size: 28rpx; padding: 0; }
+.modal-cancel { background: #f1f5f9; color: #475569; }
+.modal-confirm { background: #16a34a; color: #ffffff; }
+.warn-bg { background: #e11d48; }

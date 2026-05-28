@@ -1,0 +1,19 @@
+{
+  "pages": [
+    "pages/login/login",
+    "pages/home/home",
+    "pages/search/search",
+    "pages/category/category",
+    "pages/detail/detail",
+    "pages/index/index",
+    "pages/profile-edit/profile-edit",
+    "pages/student-auth/student-auth"
+  ],
+  "window": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "CAU二手交易平台",
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#f5f6f8"
+  },
+  "usingComponents": {}
+}

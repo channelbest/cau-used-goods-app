@@ -1,0 +1,61 @@
+<view class="page">
+  <view wx:if="{{emptyText}}" class="empty">{{emptyText}}</view>
+  <block wx:if="{{goods}}">
+    <image wx:if="{{goods.coverImage}}" class="photo-img" src="{{goods.coverImage}}" mode="aspectFill"></image>
+    <view wx:else class="photo">{{goods.category}}</view>
+
+    <view class="card">
+      <view class="goods-title">{{goods.title}}</view>
+      <view class="price">￥{{goods.priceText}}</view>
+      <view class="meta">{{goods.conditionText}} · {{goods.timeText}}</view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">商品描述</view>
+      <view class="desc">{{goods.description || '卖家暂未填写商品描述'}}</view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">商品信息</view>
+      <view class="desc">分类：{{goods.category}}</view>
+      <view class="desc">交易地点：{{goods.meetLocation || '预约后协商'}}</view>
+      <view class="desc">浏览：{{goods.viewCount}} · 收藏：{{goods.favoriteCount}}</view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">卖家信息</view>
+      <view class="desc">认证卖家，联系方式将在预约流程中确认。</view>
+    </view>
+
+    <view class="action-row">
+      <button class="action secondary" bindtap="toggleFavorite">{{favorited ? '已收藏' : '收藏'}}</button>
+      <button class="action primary" bindtap="openOrderForm">提交预约</button>
+      <button class="action warn" bindtap="openReportForm">举报</button>
+    </view>
+  </block>
+
+  <view wx:if="{{showOrderForm}}" class="mask">
+    <view class="modal">
+      <view class="modal-title">提交预约</view>
+      <input class="modal-input" value="{{orderMeetTime}}" placeholder="见面时间，如明天下午三点" bindinput="onOrderMeetTimeInput" />
+      <input class="modal-input" value="{{orderMeetLocation}}" placeholder="见面地点，如东区食堂门口" bindinput="onOrderMeetLocationInput" />
+      <textarea class="modal-textarea" value="{{orderRemark}}" placeholder="备注，可不填" bindinput="onOrderRemarkInput"></textarea>
+      <view class="modal-actions">
+        <button class="modal-cancel" bindtap="closeOrderForm">取消</button>
+        <button class="modal-confirm" bindtap="submitOrder">提交</button>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{showReportForm}}" class="mask">
+    <view class="modal">
+      <view class="modal-title">举报商品</view>
+      <input class="modal-input" value="{{reportReasonType}}" placeholder="举报原因" bindinput="onReportReasonInput" />
+      <textarea class="modal-textarea" value="{{reportDescription}}" placeholder="补充说明，可不填" bindinput="onReportDescriptionInput"></textarea>
+      <view class="modal-actions">
+        <button class="modal-cancel" bindtap="closeReportForm">取消</button>
+        <button class="modal-confirm warn-bg" bindtap="submitReport">提交</button>
+      </view>
+    </view>
+  </view>
+</view>

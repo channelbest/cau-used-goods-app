@@ -1,0 +1,11 @@
+<view class="login-page">
+  <view class="brand-card">
+    <view class="brand-mark">CAU</view>
+    <view class="brand-title">CAU二手交易平台</view>
+  </view>
+
+  <view class="login-panel">
+    <view class="panel-title">欢迎登录</view>
+    <button class="login-button" loading="{{loading}}" bindtap="handleLogin">微信登录</button>
+  </view>
+</view>

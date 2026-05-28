@@ -1,0 +1,29 @@
+<view class="page">
+  <view class="home-header">
+    <view class="hello">CAU二手交易平台</view>
+    <button class="mine-button" bindtap="goMine">我的</button>
+  </view>
+
+  <view class="search-box" bindtap="goSearch">搜索二手商品</view>
+
+  <view class="section-title">商品分类</view>
+  <view class="category-grid">
+    <view wx:for="{{categories}}" wx:key="id" class="category-item" data-id="{{item.id}}" data-name="{{item.name}}" bindtap="goCategory">
+      {{item.name}}
+    </view>
+  </view>
+
+  <view class="section-title">最新商品</view>
+  <view wx:if="{{emptyText}}" class="empty">{{emptyText}}</view>
+  <view class="goods-list">
+    <view wx:for="{{goodsList}}" wx:key="id" class="goods-card" data-id="{{item.id}}" bindtap="goDetail">
+      <image wx:if="{{item.coverImage}}" class="goods-image-img" src="{{item.coverImage}}" mode="aspectFill"></image>
+      <view wx:else class="goods-image">{{item.category}}</view>
+      <view class="goods-info">
+        <view class="goods-title">{{item.title}}</view>
+        <view class="goods-meta">{{item.conditionText}} · {{item.timeText}}</view>
+        <view class="goods-price">￥{{item.priceText}}</view>
+      </view>
+    </view>
+  </view>
+</view>

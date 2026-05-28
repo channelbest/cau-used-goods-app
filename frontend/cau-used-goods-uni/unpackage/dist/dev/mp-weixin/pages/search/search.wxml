@@ -1,0 +1,45 @@
+<view class="page">
+  <input class="search-input" value="{{keyword}}" placeholder="请输入商品名称或分类" bindinput="onKeywordInput" />
+
+  <view class="filter-card">
+    <view class="filter-title">分类</view>
+    <view class="chip-row">
+      <view wx:for="{{categories}}" wx:key="id" class="chip {{categoryId === item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="setCategory">{{item.name}}</view>
+    </view>
+
+    <view class="filter-title">价格区间</view>
+    <view class="price-row">
+      <input class="price-input" type="number" value="{{minPrice}}" placeholder="最低价" bindinput="onMinPriceInput" />
+      <view class="price-line">-</view>
+      <input class="price-input" type="number" value="{{maxPrice}}" placeholder="最高价" bindinput="onMaxPriceInput" />
+    </view>
+
+    <view class="filter-title">新旧程度</view>
+    <view class="chip-row">
+      <view wx:for="{{conditions}}" wx:key="*this" class="chip {{condition === item || (condition === 'all' && item === '全部') ? 'active' : ''}}" data-condition="{{item}}" bindtap="setCondition">{{item}}</view>
+    </view>
+
+    <view class="filter-title">排序</view>
+    <view class="chip-row">
+      <view class="chip {{sortType === 'latest' ? 'active' : ''}}" data-sort="latest" bindtap="setSort">最新发布</view>
+      <view class="chip {{sortType === 'priceAsc' ? 'active' : ''}}" data-sort="priceAsc" bindtap="setSort">价格最低</view>
+      <view class="chip {{sortType === 'priceDesc' ? 'active' : ''}}" data-sort="priceDesc" bindtap="setSort">价格最高</view>
+    </view>
+
+    <button class="reset-button" bindtap="resetFilters">重置筛选</button>
+  </view>
+
+  <view class="result-title">搜索结果</view>
+  <view wx:if="{{emptyText}}" class="empty">{{emptyText}}</view>
+  <view class="goods-list">
+    <view wx:for="{{goodsList}}" wx:key="id" class="goods-card" data-id="{{item.id}}" bindtap="goDetail">
+      <image wx:if="{{item.coverImage}}" class="goods-image-img" src="{{item.coverImage}}" mode="aspectFill"></image>
+      <view wx:else class="goods-image">{{item.category}}</view>
+      <view class="goods-info">
+        <view class="goods-title">{{item.title}}</view>
+        <view class="goods-meta">{{item.conditionText}} · {{item.timeText}}</view>
+        <view class="goods-price">￥{{item.priceText}}</view>
+      </view>
+    </view>
+  </view>
+</view>

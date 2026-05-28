@@ -1,0 +1,20 @@
+<view class="page">
+  <view class="title">{{title}}</view>
+  <view class="sort-row">
+    <view class="sort-item {{sortType === 'latest' ? 'active' : ''}}" data-sort="latest" bindtap="setSort">最新发布</view>
+    <view class="sort-item {{sortType === 'priceAsc' ? 'active' : ''}}" data-sort="priceAsc" bindtap="setSort">价格最低</view>
+    <view class="sort-item {{sortType === 'priceDesc' ? 'active' : ''}}" data-sort="priceDesc" bindtap="setSort">价格最高</view>
+  </view>
+  <view wx:if="{{emptyText}}" class="empty">{{emptyText}}</view>
+  <view class="goods-list">
+    <view wx:for="{{goodsList}}" wx:key="id" class="goods-card" data-id="{{item.id}}" bindtap="goDetail">
+      <image wx:if="{{item.coverImage}}" class="goods-image-img" src="{{item.coverImage}}" mode="aspectFill"></image>
+      <view wx:else class="goods-image">{{item.category}}</view>
+      <view class="goods-info">
+        <view class="goods-title">{{item.title}}</view>
+        <view class="goods-meta">{{item.conditionText}}</view>
+        <view class="goods-price">￥{{item.priceText}}</view>
+      </view>
+    </view>
+  </view>
+</view>
