@@ -13,6 +13,7 @@ type Config struct {
 	JWT      JWTConfig      `yaml:"jwt"`
 	Wechat   WechatConfig   `yaml:"wechat"`
 	Database DatabaseConfig `yaml:"database"`
+	AI       AIConfig       `yaml:"ai"`
 }
 
 type ServerConfig struct {
@@ -28,6 +29,10 @@ type JWTConfig struct {
 type WechatConfig struct {
 	AppID     string `yaml:"app_id"`
 	AppSecret string `yaml:"app_secret"`
+}
+
+type AIConfig struct {
+	APIKey string `yaml:"api_key"`
 }
 
 type DatabaseConfig struct {
