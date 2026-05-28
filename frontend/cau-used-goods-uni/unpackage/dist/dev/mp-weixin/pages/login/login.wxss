@@ -1,45 +1,44 @@
-
-.page.data-v-e4e4508d {
+.login-page {
   min-height: 100vh;
-  padding: 120rpx 48rpx;
-  background: #f6f7f9;
+  padding: 72rpx 40rpx;
   box-sizing: border-box;
+  background: linear-gradient(180deg, #eaf7ef 0%, #f6f7f9 42%, #f6f7f9 100%);
 }
-.title.data-v-e4e4508d {
-  margin-top: 120rpx;
-  font-size: 44rpx;
-  font-weight: 700;
-  color: #1f2933;
+.brand-card {
+  padding-top: 80rpx;
   text-align: center;
 }
-.subtitle.data-v-e4e4508d {
-  margin-top: 24rpx;
-  font-size: 28rpx;
-  color: #6b7280;
-  text-align: center;
+.brand-mark {
+  width: 112rpx;
+  height: 112rpx;
+  line-height: 112rpx;
+  margin: 0 auto 32rpx;
+  border-radius: 28rpx;
+  background: #16a34a;
+  color: #ffffff;
+  font-size: 34rpx;
+  font-weight: 800;
 }
-.login-button.data-v-e4e4508d {
-  margin-top: 120rpx;
+.brand-title {
+  font-size: 46rpx;
+  font-weight: 800;
+  color: #172033;
+}
+.login-panel {
+  margin-top: 96rpx;
+  padding: 40rpx 32rpx;
+  border-radius: 16rpx;
+  background: #ffffff;
+  box-shadow: 0 12rpx 36rpx rgba(15, 23, 42, 0.08);
+}
+.panel-title { font-size: 34rpx; font-weight: 700; color: #172033; text-align: center; }
+.login-button {
+  margin-top: 40rpx;
   height: 88rpx;
   line-height: 88rpx;
   border-radius: 12rpx;
-  background: #1aad19;
+  background: #16a34a;
   color: #ffffff;
   font-size: 32rpx;
-}
-.secondary-button.data-v-e4e4508d {
-  margin-top: 24rpx;
-  height: 88rpx;
-  line-height: 88rpx;
-  border-radius: 12rpx;
-  background: #ffffff;
-  color: #374151;
-  font-size: 30rpx;
-}
-.tip.data-v-e4e4508d {
-  margin-top: 32rpx;
-  line-height: 1.6;
-  font-size: 24rpx;
-  color: #9ca3af;
-  text-align: center;
+  font-weight: 700;
 }

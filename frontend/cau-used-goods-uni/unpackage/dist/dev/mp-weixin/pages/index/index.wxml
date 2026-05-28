@@ -1,1 +1,23 @@
-<view class="content"><image class="logo" src="{{a}}"></image><view class="text-area"><text class="title">{{b}}</text></view></view>
+<view class="page">
+  <view class="profile-card">
+    <view class="avatar">
+      <image wx:if="{{avatarUrl}}" class="avatar-img" src="{{avatarUrl}}" mode="aspectFill"></image>
+    </view>
+    <view class="profile-info">
+      <view class="nickname">{{user && user.nickname ? user.nickname : '微信用户'}}</view>
+      <view class="status" wx:if="{{isAdmin}}">账号身份：管理员</view>
+      <view class="status" wx:else>学生认证：{{authStatusText}}</view>
+    </view>
+    <button class="edit-button" bindtap="goProfileEdit">修改资料</button>
+  </view>
+
+  <view class="panel" wx:if="{{isAdmin}}">
+    <view class="menu-item" bindtap="goStudentVerifyList">学生认证审核</view>
+  </view>
+
+  <view class="panel" wx:else>
+    <view class="menu-item" bindtap="goStudentAuth">学生认证</view>
+  </view>
+
+  <button class="logout-button" bindtap="logout">退出登录</button>
+</view>

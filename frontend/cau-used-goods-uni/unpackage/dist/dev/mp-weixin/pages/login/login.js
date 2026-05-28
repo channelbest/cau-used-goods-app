@@ -1,60 +1,49 @@
 "use strict";
-const common_vendor = require("../../common/vendor.js");
-const api_auth = require("../../api/auth.js");
-const utils_auth = require("../../utils/auth.js");
-const _sfc_main = {
-  __name: "login",
-  setup(__props) {
-    const loading = common_vendor.ref(false);
-    const goNext = (user) => {
-      if ((user == null ? void 0 : user.authStatus) === "VERIFIED") {
-        common_vendor.index.navigateTo({
-          url: "/pages/home/home"
-        });
-        return;
-      }
-      common_vendor.index.navigateTo({
-        url: "/pages/student-auth/student-auth"
+const api = require("../../api/auth.js");
+const auth = require("../../utils/auth.js");
+
+Page({
+  data: {
+    loading: false
+  },
+
+  wxLogin() {
+    return new Promise((resolve, reject) => {
+      wx.login({
+        success: (res) => {
+          if (res.code) resolve(res.code);
+          else reject(new Error("微信登录凭证获取失败"));
+        },
+        fail: () => reject(new Error("微信登录失败"))
       });
-    };
-    const handleDevLogin = async () => {
-      if (loading.value)
-        return;
-      loading.value = true;
+    });
+  },
+
+  async handleLogin() {
+    if (this.data.loading) return;
+    this.setData({ loading: true });
+    try {
+      let result;
       try {
-        const result = await api_auth.devLogin({
+        const code = await this.wxLogin();
+        result = await api.wechatLogin(code);
+      } catch (wechatError) {
+        result = await api.devLogin({
           openid: "frontend_a_dev_user",
+          nickname: "微信用户",
           role: "USER"
         });
-        utils_auth.saveLoginResult(result);
-        common_vendor.index.showToast({
-          title: "Login success",
-          icon: "success"
-        });
-        goNext(result.user);
-      } catch (error) {
-        common_vendor.index.showToast({
-          title: error.message || "Login failed",
-          icon: "none"
-        });
-      } finally {
-        loading.value = false;
       }
-    };
-    const previewStudentAuth = () => {
-      common_vendor.index.navigateTo({
-        url: "/pages/student-auth/student-auth"
+      auth.saveLoginResult(result);
+      wx.showToast({ title: "登录成功", icon: "success" });
+      wx.reLaunch({ url: "/pages/home/home" });
+    } catch (error) {
+      wx.showToast({
+        title: error.message || "登录失败，请确认后端服务已启动",
+        icon: "none"
       });
-    };
-    return (_ctx, _cache) => {
-      return {
-        a: loading.value,
-        b: common_vendor.o(handleDevLogin, "3e"),
-        c: common_vendor.o(previewStudentAuth, "6d")
-      };
-    };
+    } finally {
+      this.setData({ loading: false });
+    }
   }
-};
-const MiniProgramPage = /* @__PURE__ */ common_vendor._export_sfc(_sfc_main, [["__scopeId", "data-v-e4e4508d"]]);
-wx.createPage(MiniProgramPage);
-//# sourceMappingURL=../../../.sourcemap/mp-weixin/pages/login/login.js.map
+});

@@ -1,42 +1,59 @@
 "use strict";
-const common_vendor = require("../../common/vendor.js");
-const _sfc_main = {
-  __name: "category",
-  setup(__props) {
-    const goodsList = [
-      {
-        id: 1,
-        title: "教材书籍示例商品",
-        condition: "八成新",
-        price: 20
-      },
-      {
-        id: 2,
-        title: "分类下的商品",
-        condition: "九成新",
-        price: 35
-      }
-    ];
-    const goDetail = (id) => {
-      common_vendor.index.navigateTo({
-        url: `/pages/detail/detail?id=${id}`
-      });
-    };
-    return (_ctx, _cache) => {
-      return {
-        a: common_vendor.f(goodsList, (item, k0, i0) => {
-          return {
-            a: common_vendor.t(item.title),
-            b: common_vendor.t(item.condition),
-            c: common_vendor.t(item.price),
-            d: item.id,
-            e: common_vendor.o(($event) => goDetail(item.id), item.id)
-          };
-        })
-      };
-    };
-  }
+const productApi = require("../../api/product.js");
+const productFormat = require("../../utils/product-format.js");
+
+const sortMap = {
+  latest: "newest",
+  priceAsc: "price_asc",
+  priceDesc: "price_desc"
 };
-const MiniProgramPage = /* @__PURE__ */ common_vendor._export_sfc(_sfc_main, [["__scopeId", "data-v-8145b772"]]);
-wx.createPage(MiniProgramPage);
-//# sourceMappingURL=../../../.sourcemap/mp-weixin/pages/category/category.js.map
+
+Page({
+  data: {
+    categoryId: "",
+    title: "分类商品",
+    sortType: "latest",
+    goodsList: [],
+    emptyText: "",
+    loading: false
+  },
+
+  onLoad(options) {
+    this.setData({
+      categoryId: options.categoryId || "",
+      title: options.name ? decodeURIComponent(options.name) : "分类商品"
+    });
+    this.loadProducts();
+  },
+
+  setSort(event) {
+    this.setData({ sortType: event.currentTarget.dataset.sort });
+    this.loadProducts();
+  },
+
+  async loadProducts() {
+    this.setData({ loading: true, emptyText: "" });
+    try {
+      const categories = await productApi.listCategories();
+      const categoryMap = productFormat.buildCategoryMap(categories);
+      const result = await productApi.listProducts({
+        categoryId: this.data.categoryId,
+        status: "ON_SALE",
+        sort: sortMap[this.data.sortType] || "newest",
+        page: 1,
+        pageSize: 50
+      });
+      const list = (result.list || []).map(item => productFormat.formatProduct(item, categoryMap));
+      this.setData({ goodsList: list, emptyText: list.length ? "" : "该分类暂无商品" });
+    } catch (error) {
+      this.setData({ emptyText: error.message || "商品加载失败" });
+      wx.showToast({ title: error.message || "商品加载失败", icon: "none" });
+    } finally {
+      this.setData({ loading: false });
+    }
+  },
+
+  goDetail(event) {
+    wx.navigateTo({ url: `/pages/detail/detail?id=${event.currentTarget.dataset.id}` });
+  }
+});

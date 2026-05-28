@@ -1,0 +1,9 @@
+.page { min-height: 100vh; padding: 32rpx 28rpx 56rpx; background: #f5f6f8; box-sizing: border-box; }
+.profile-card { display: flex; align-items: center; padding: 30rpx; border-radius: 16rpx; background: #ffffff; }
+.avatar { width: 116rpx; height: 116rpx; line-height: 116rpx; border-radius: 58rpx; background: #dbe4ea; color: #64748b; text-align: center; font-size: 24rpx; overflow: hidden; flex-shrink: 0; }
+.avatar-img { width: 116rpx; height: 116rpx; display: block; }
+.wechat-button { margin-left: 24rpx; flex: 1; height: 78rpx; line-height: 78rpx; border-radius: 12rpx; background: #f1f5f9; color: #16a34a; font-size: 27rpx; }
+.form-card { margin-top: 24rpx; padding: 30rpx; border-radius: 16rpx; background: #ffffff; }
+.label { margin: 24rpx 0 12rpx; color: #475569; font-size: 26rpx; font-weight: 600; }
+.input { height: 84rpx; padding: 0 24rpx; border-radius: 12rpx; background: #f1f5f9; font-size: 28rpx; box-sizing: border-box; }
+.save-button { margin-top: 42rpx; height: 86rpx; line-height: 86rpx; border-radius: 12rpx; background: #16a34a; color: #ffffff; font-size: 30rpx; font-weight: 700; }

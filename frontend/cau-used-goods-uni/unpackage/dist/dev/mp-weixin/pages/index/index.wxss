@@ -1,23 +1,12 @@
-
-.content {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-}
-.logo {
-		height: 200rpx;
-		width: 200rpx;
-		margin-top: 200rpx;
-		margin-left: auto;
-		margin-right: auto;
-		margin-bottom: 50rpx;
-}
-.text-area {
-		display: flex;
-		justify-content: center;
-}
-.title {
-		font-size: 36rpx;
-		color: #8f8f94;
-}
+.page { min-height: 100vh; padding: 32rpx 28rpx 56rpx; background: #f5f6f8; box-sizing: border-box; }
+.profile-card { display: flex; align-items: center; padding: 32rpx; border-radius: 16rpx; background: #ffffff; }
+.avatar { width: 112rpx; height: 112rpx; border-radius: 56rpx; background: #dbe4ea; overflow: hidden; flex-shrink: 0; }
+.avatar-img { width: 112rpx; height: 112rpx; display: block; }
+.profile-info { margin-left: 24rpx; flex: 1; min-width: 0; }
+.nickname { font-size: 32rpx; font-weight: 800; color: #172033; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status { margin-top: 12rpx; color: #64748b; font-size: 24rpx; }
+.edit-button { width: 144rpx; height: 62rpx; line-height: 62rpx; padding: 0; border-radius: 31rpx; background: #f1f5f9; color: #16a34a; font-size: 24rpx; }
+.panel { margin-top: 24rpx; padding: 28rpx; border-radius: 16rpx; background: #ffffff; }
+.menu-item { padding: 24rpx 0; color: #172033; font-size: 30rpx; font-weight: 700; border-bottom: 1rpx solid #eef2f7; }
+.logout-button { margin-top: 30rpx; height: 82rpx; line-height: 82rpx; border-radius: 12rpx; background: #ffffff; color: #ef4444; font-size: 30rpx; }
+.menu-item:last-child { border-bottom: 0; }

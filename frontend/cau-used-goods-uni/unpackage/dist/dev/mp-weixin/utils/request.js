@@ -27,20 +27,19 @@ const request = ({
         const body = res.data || {};
         if (res.statusCode === 401) {
           utils_auth.clearAuth();
-          reject(new Error(body.message || "Login expired, please login again"));
+          reject(new Error(body.message || "登录已过期，请重新登录"));
           return;
         }
         if (res.statusCode < 200 || res.statusCode >= 300 || body.code !== 0) {
-          reject(new Error(body.message || "Request failed"));
+          reject(new Error(body.message || "请求失败"));
           return;
         }
         resolve(body.data);
       },
       fail: () => {
-        reject(new Error("Cannot connect to server. Please make sure backend is running."));
+        reject(new Error("无法连接服务器，请确认后端服务已启动"));
       }
     });
   });
 };
 exports.request = request;
-//# sourceMappingURL=../../.sourcemap/mp-weixin/utils/request.js.map
