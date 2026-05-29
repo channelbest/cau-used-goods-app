@@ -25,7 +25,68 @@ backend/cmd/server/main.go
 - 每次新增、编辑、改状态、删除公告都会写入 `admin_logs`。
 - 由于 `announcements` 表没有 `is_deleted` 字段，`DELETE` 当前按下线处理，即设置 `status = OFFLINE`。
 
-## 二、测试前置条件
+## 二、下线和删除的区别
+
+当前数据库表 `announcements` 没有 `is_deleted`、`deleted_time` 之类的删除字段，所以公告删除暂时不做物理删除，也不做真正的逻辑删除。
+
+### 下线公告
+
+接口：
+
+```http
+PUT /admin/announcements/:id/status
+```
+
+请求体：
+
+```json
+{
+  "status": "OFFLINE"
+}
+```
+
+含义：
+
+- 表示公告暂时不展示。
+- 后续仍然可以编辑、重新发布。
+- 管理员操作日志记录为 `STATUS_NOTICE`。
+
+### 删除公告
+
+接口：
+
+```http
+DELETE /admin/announcements/:id
+```
+
+当前实现：
+
+- 不物理删除数据。
+- 实际执行效果也是设置 `status = OFFLINE`。
+- 管理员操作日志记录为 `DELETE_NOTICE`。
+
+前端理解：
+
+- 如果用户点击“下线”，调用状态更新接口。
+- 如果用户点击“删除”，调用 DELETE 接口。
+- 两者当前展示效果一样，都是不再作为有效公告展示。
+- 区别主要体现在管理员操作语义和后台日志记录。
+
+后续如果数据库增加：
+
+```text
+is_deleted
+deleted_time
+```
+
+则可以调整为：
+
+```text
+下线 = status 设置为 OFFLINE
+删除 = is_deleted 设置为 1
+```
+
+## 三、测试前置条件
 
 本地服务默认地址：
 
@@ -47,7 +108,7 @@ announcements
 admin_logs
 ```
 
-## 三、PowerShell 测试命令
+## 四、PowerShell 测试命令
 
 ### 3.1 获取管理员 Token
 
@@ -189,7 +250,7 @@ Invoke-RestMethod `
 - 公告状态为 `OFFLINE`。
 - `admin_logs` 中新增 `DELETE_NOTICE` 日志。
 
-## 四、异常场景测试
+## 五、异常场景测试
 
 ### 4.1 普通用户不能访问公告管理
 
@@ -279,7 +340,7 @@ try {
 404
 ```
 
-## 五、测试结论模板
+## 六、测试结论模板
 
 ```text
 测试模块：管理员公告管理模块
@@ -302,7 +363,7 @@ try {
 结论：管理员公告管理模块接口测试通过
 ```
 
-## 六、提交建议
+## 七、提交建议
 
 ```bash
 git status

@@ -194,6 +194,14 @@ OFFLINE
 - 由于 `announcements` 表没有 `is_deleted` 字段，`DELETE` 当前按下线处理，即设置 `status = OFFLINE`。
 - 新增、编辑、改状态、删除公告时写入 `admin_logs`。
 
+下线和删除的前端理解：
+
+- 下线接口：`PUT /admin/announcements/:id/status`，请求 `status = OFFLINE`。
+- 删除接口：`DELETE /admin/announcements/:id`。
+- 当前两者都会让公告变为 `OFFLINE`，即不再作为有效公告展示。
+- 区别在业务语义和日志记录：下线记录 `STATUS_NOTICE`，删除记录 `DELETE_NOTICE`。
+- 如果后续数据库增加 `is_deleted`、`deleted_time` 字段，删除接口可调整为真正逻辑删除。
+
 ### 3.4 管理员敏感词管理模块
 
 代码目录：
