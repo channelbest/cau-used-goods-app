@@ -7,16 +7,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"cau-used-goods-app/backend/internal/admin"
 	"cau-used-goods-app/backend/internal/ai"
 	"cau-used-goods-app/backend/internal/auth"
 	"cau-used-goods-app/backend/internal/config"
 	"cau-used-goods-app/backend/internal/db"
 	"cau-used-goods-app/backend/internal/favorite"
+	"cau-used-goods-app/backend/internal/message"
 	"cau-used-goods-app/backend/internal/middleware"
 	"cau-used-goods-app/backend/internal/order"
+	"cau-used-goods-app/backend/internal/product"
 	"cau-used-goods-app/backend/internal/report"
 	"cau-used-goods-app/backend/internal/review"
-	"cau-used-goods-app/backend/internal/product"
 	"cau-used-goods-app/backend/internal/sensitive"
 	"cau-used-goods-app/backend/internal/stats"
 	"cau-used-goods-app/backend/internal/upload"
@@ -54,9 +56,12 @@ func main() {
 	userHandler := user.NewHandler(userService)
 	sensitiveRepo := sensitive.NewRepository(db.DB())
 	sensitiveService := sensitive.NewService(sensitiveRepo)
+	productRepo := product.NewRepository(db.DB())
+	productService := product.NewService(productRepo, sensitiveService)
+	productHandler := product.NewHandler(productService)
 
 	orderRepo := order.NewRepository(db.DB())
-	orderService := order.NewService(orderRepo)
+	orderService := order.NewService(orderRepo, productService)
 	orderHandler := order.NewHandler(orderService)
 
 	favoriteRepo := favorite.NewRepository(db.DB())
@@ -68,12 +73,19 @@ func main() {
 	reviewHandler := review.NewHandler(reviewService)
 
 	reportRepo := report.NewRepository(db.DB())
-	reportService := report.NewService(reportRepo)
+	reportService := report.NewService(reportRepo, db.DB(), sensitiveService)
 	reportHandler := report.NewHandler(reportService)
 
-	productRepo := product.NewRepository(db.DB())
-	productService := product.NewService(productRepo, sensitiveService)
-	productHandler := product.NewHandler(productService)
+	messageRepo := message.NewRepository(db.DB())
+	messageService := message.NewService(messageRepo)
+	messageHandler := message.NewHandler(messageService)
+
+	adminRepo := admin.NewRepository(db.DB())
+	adminService := admin.NewService(adminRepo)
+	adminHandler := admin.NewHandler(adminService)
+	sensitiveService.SetAdminLogger(adminService)
+	sensitiveHandler := sensitive.NewHandler(sensitiveService)
+
 	uploadService := upload.NewService()
 	uploadHandler := upload.NewHandler(uploadService)
 	statsRepo := stats.NewRepository(db.DB())
@@ -94,11 +106,14 @@ func main() {
 	favorite.RegisterRoutes(r, favoriteHandler, authMiddleware, verifiedMiddleware)
 	review.RegisterRoutes(r, reviewHandler, authMiddleware, verifiedMiddleware)
 	report.RegisterRoutes(r, reportHandler, authMiddleware, verifiedMiddleware)
+	message.RegisterRoutes(r, messageHandler, authMiddleware)
+	admin.RegisterRoutes(r, adminHandler, authMiddleware, middleware.Admin())
+	sensitive.RegisterAdminRoutes(r, sensitiveHandler, authMiddleware, middleware.Admin())
 
 	product.RegisterRoutes(r, productHandler, authMiddleware)
 	upload.RegisterRoutes(r, uploadHandler, authMiddleware)
 	ai.RegisterRoutes(r, aiHandler, authMiddleware)
-	stats.RegisterRoutes(r, statsHandler, authMiddleware)
+	stats.RegisterRoutes(r, statsHandler, authMiddleware, middleware.Admin())
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	log.Printf("server listening on %s", addr)
 	if err := r.Run(addr); err != nil {

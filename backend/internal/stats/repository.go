@@ -45,6 +45,39 @@ type ProductTrendItem struct {
 	Count int    `json:"count"`
 }
 
+type OrderOverview struct {
+	TotalOrders           int     `json:"totalOrders"`
+	PendingConfirmOrders  int     `json:"pendingConfirmOrders"`
+	WaitMeetOrders        int     `json:"waitMeetOrders"`
+	CompletedOrders       int     `json:"completedOrders"`
+	CanceledOrders        int     `json:"canceledOrders"`
+	ExceptionClosedOrders int     `json:"exceptionClosedOrders"`
+	TotalCompletedAmount  float64 `json:"totalCompletedAmount"`
+	AverageCompletedPrice float64 `json:"averageCompletedPrice"`
+}
+
+type UserOverview struct {
+	TotalUsers      int `json:"totalUsers"`
+	NormalUsers     int `json:"normalUsers"`
+	DisabledUsers   int `json:"disabledUsers"`
+	VerifiedUsers   int `json:"verifiedUsers"`
+	PendingUsers    int `json:"pendingUsers"`
+	UnverifiedUsers int `json:"unverifiedUsers"`
+	AdminUsers      int `json:"adminUsers"`
+}
+
+type ReportOverview struct {
+	TotalReports      int `json:"totalReports"`
+	PendingReports    int `json:"pendingReports"`
+	ProcessingReports int `json:"processingReports"`
+	ResolvedReports   int `json:"resolvedReports"`
+	RejectedReports   int `json:"rejectedReports"`
+	ClosedReports     int `json:"closedReports"`
+	ProductReports    int `json:"productReports"`
+	UserReports       int `json:"userReports"`
+	OrderReports      int `json:"orderReports"`
+}
+
 func (r *Repository) ProductOverview(ctx context.Context) (*ProductOverview, error) {
 	var overview ProductOverview
 
@@ -75,6 +108,93 @@ func (r *Repository) ProductOverview(ctx context.Context) (*ProductOverview, err
 		return nil, err
 	}
 
+	return &overview, nil
+}
+
+func (r *Repository) OrderOverview(ctx context.Context) (*OrderOverview, error) {
+	var overview OrderOverview
+	err := r.db.QueryRowContext(ctx, `
+		SELECT
+			COUNT(*) AS total_orders,
+			COALESCE(SUM(CASE WHEN status = 'PENDING_CONFIRM' THEN 1 ELSE 0 END), 0) AS pending_confirm_orders,
+			COALESCE(SUM(CASE WHEN status = 'WAIT_MEET' THEN 1 ELSE 0 END), 0) AS wait_meet_orders,
+			COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END), 0) AS completed_orders,
+			COALESCE(SUM(CASE WHEN status = 'CANCELED' THEN 1 ELSE 0 END), 0) AS canceled_orders,
+			COALESCE(SUM(CASE WHEN status = 'EXCEPTION_CLOSED' THEN 1 ELSE 0 END), 0) AS exception_closed_orders,
+			COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN product_price_snapshot ELSE 0 END), 0) AS total_completed_amount,
+			COALESCE(AVG(CASE WHEN status = 'COMPLETED' THEN product_price_snapshot ELSE NULL END), 0) AS average_completed_price
+		FROM orders
+	`).Scan(
+		&overview.TotalOrders,
+		&overview.PendingConfirmOrders,
+		&overview.WaitMeetOrders,
+		&overview.CompletedOrders,
+		&overview.CanceledOrders,
+		&overview.ExceptionClosedOrders,
+		&overview.TotalCompletedAmount,
+		&overview.AverageCompletedPrice,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &overview, nil
+}
+
+func (r *Repository) UserOverview(ctx context.Context) (*UserOverview, error) {
+	var overview UserOverview
+	err := r.db.QueryRowContext(ctx, `
+		SELECT
+			COUNT(*) AS total_users,
+			COALESCE(SUM(CASE WHEN account_status = 'NORMAL' AND is_deleted = 0 THEN 1 ELSE 0 END), 0) AS normal_users,
+			COALESCE(SUM(CASE WHEN account_status = 'DISABLED' AND is_deleted = 0 THEN 1 ELSE 0 END), 0) AS disabled_users,
+			COALESCE(SUM(CASE WHEN auth_status = 'VERIFIED' AND is_deleted = 0 THEN 1 ELSE 0 END), 0) AS verified_users,
+			COALESCE(SUM(CASE WHEN auth_status = 'PENDING' AND is_deleted = 0 THEN 1 ELSE 0 END), 0) AS pending_users,
+			COALESCE(SUM(CASE WHEN auth_status = 'UNVERIFIED' AND is_deleted = 0 THEN 1 ELSE 0 END), 0) AS unverified_users,
+			COALESCE(SUM(CASE WHEN role = 'ADMIN' AND is_deleted = 0 THEN 1 ELSE 0 END), 0) AS admin_users
+		FROM users
+	`).Scan(
+		&overview.TotalUsers,
+		&overview.NormalUsers,
+		&overview.DisabledUsers,
+		&overview.VerifiedUsers,
+		&overview.PendingUsers,
+		&overview.UnverifiedUsers,
+		&overview.AdminUsers,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &overview, nil
+}
+
+func (r *Repository) ReportOverview(ctx context.Context) (*ReportOverview, error) {
+	var overview ReportOverview
+	err := r.db.QueryRowContext(ctx, `
+		SELECT
+			COUNT(*) AS total_reports,
+			COALESCE(SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END), 0) AS pending_reports,
+			COALESCE(SUM(CASE WHEN status = 'PROCESSING' THEN 1 ELSE 0 END), 0) AS processing_reports,
+			COALESCE(SUM(CASE WHEN status = 'RESOLVED' THEN 1 ELSE 0 END), 0) AS resolved_reports,
+			COALESCE(SUM(CASE WHEN status = 'REJECTED' THEN 1 ELSE 0 END), 0) AS rejected_reports,
+			COALESCE(SUM(CASE WHEN status = 'CLOSED' THEN 1 ELSE 0 END), 0) AS closed_reports,
+			COALESCE(SUM(CASE WHEN target_type = 'PRODUCT' THEN 1 ELSE 0 END), 0) AS product_reports,
+			COALESCE(SUM(CASE WHEN target_type = 'USER' THEN 1 ELSE 0 END), 0) AS user_reports,
+			COALESCE(SUM(CASE WHEN target_type = 'ORDER' THEN 1 ELSE 0 END), 0) AS order_reports
+		FROM reports
+	`).Scan(
+		&overview.TotalReports,
+		&overview.PendingReports,
+		&overview.ProcessingReports,
+		&overview.ResolvedReports,
+		&overview.RejectedReports,
+		&overview.ClosedReports,
+		&overview.ProductReports,
+		&overview.UserReports,
+		&overview.OrderReports,
+	)
+	if err != nil {
+		return nil, err
+	}
 	return &overview, nil
 }
 

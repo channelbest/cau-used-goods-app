@@ -70,7 +70,7 @@ func (h *Handler) GetByID(c *gin.Context) {
 }
 
 func (h *Handler) ListByProduct(c *gin.Context) {
-	productID, err := strconv.ParseUint(c.Param("productId"), 10, 64)
+	productID, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || productID == 0 {
 		response.Error(c, http.StatusBadRequest, response.CodeBadRequest, "invalid product id")
 		return
@@ -94,7 +94,7 @@ func (h *Handler) ListByProduct(c *gin.Context) {
 }
 
 func (h *Handler) ListBySeller(c *gin.Context) {
-	sellerID, err := strconv.ParseUint(c.Param("sellerId"), 10, 64)
+	sellerID, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || sellerID == 0 {
 		response.Error(c, http.StatusBadRequest, response.CodeBadRequest, "invalid seller id")
 		return
