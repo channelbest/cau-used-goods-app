@@ -171,7 +171,8 @@ $userLogin = Invoke-RestMethod `
   -ContentType "application/json" `
   -Body '{"openid":"dev_user_word_001","role":"USER"}'
 
-$userHeaders = @{ Authorization = "Bearer $userLogin.data.token" }
+$userToken = $userLogin.data.token
+$userHeaders = @{ Authorization = "Bearer $userToken" }
 
 try {
   Invoke-RestMethod `

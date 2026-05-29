@@ -32,7 +32,8 @@ $adminLogin = Invoke-RestMethod `
   -ContentType "application/json" `
   -Body '{"openid":"dev_admin_stats_001","role":"ADMIN"}'
 
-$adminHeaders = @{ Authorization = "Bearer $adminLogin.data.token" }
+$adminToken = $adminLogin.data.token
+$adminHeaders = @{ Authorization = "Bearer $adminToken" }
 ```
 
 ### 2.2 商品总览
@@ -175,7 +176,8 @@ $userLogin = Invoke-RestMethod `
   -ContentType "application/json" `
   -Body '{"openid":"dev_user_stats_001","role":"USER"}'
 
-$userHeaders = @{ Authorization = "Bearer $userLogin.data.token" }
+$userToken = $userLogin.data.token
+$userHeaders = @{ Authorization = "Bearer $userToken" }
 
 try {
   Invoke-RestMethod `
