@@ -54,9 +54,12 @@ func main() {
 	userHandler := user.NewHandler(userService)
 	sensitiveRepo := sensitive.NewRepository(db.DB())
 	sensitiveService := sensitive.NewService(sensitiveRepo)
+	productRepo := product.NewRepository(db.DB())
+	productService := product.NewService(productRepo, sensitiveService)
+	productHandler := product.NewHandler(productService)
 
 	orderRepo := order.NewRepository(db.DB())
-	orderService := order.NewService(orderRepo)
+	orderService := order.NewService(orderRepo, productService)
 	orderHandler := order.NewHandler(orderService)
 
 	favoriteRepo := favorite.NewRepository(db.DB())
@@ -68,12 +71,9 @@ func main() {
 	reviewHandler := review.NewHandler(reviewService)
 
 	reportRepo := report.NewRepository(db.DB())
-	reportService := report.NewService(reportRepo)
+	reportService := report.NewService(reportRepo, db.DB(), sensitiveService)
 	reportHandler := report.NewHandler(reportService)
 
-	productRepo := product.NewRepository(db.DB())
-	productService := product.NewService(productRepo, sensitiveService)
-	productHandler := product.NewHandler(productService)
 	uploadService := upload.NewService()
 	uploadHandler := upload.NewHandler(uploadService)
 	statsRepo := stats.NewRepository(db.DB())
