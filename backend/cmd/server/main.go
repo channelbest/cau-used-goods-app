@@ -12,6 +12,7 @@ import (
 	"cau-used-goods-app/backend/internal/config"
 	"cau-used-goods-app/backend/internal/db"
 	"cau-used-goods-app/backend/internal/favorite"
+	"cau-used-goods-app/backend/internal/message"
 	"cau-used-goods-app/backend/internal/middleware"
 	"cau-used-goods-app/backend/internal/order"
 	"cau-used-goods-app/backend/internal/report"
@@ -74,6 +75,10 @@ func main() {
 	reportService := report.NewService(reportRepo, db.DB(), sensitiveService)
 	reportHandler := report.NewHandler(reportService)
 
+	messageRepo := message.NewRepository(db.DB())
+	messageService := message.NewService(messageRepo)
+	messageHandler := message.NewHandler(messageService)
+
 	uploadService := upload.NewService()
 	uploadHandler := upload.NewHandler(uploadService)
 	statsRepo := stats.NewRepository(db.DB())
@@ -94,6 +99,7 @@ func main() {
 	favorite.RegisterRoutes(r, favoriteHandler, authMiddleware, verifiedMiddleware)
 	review.RegisterRoutes(r, reviewHandler, authMiddleware, verifiedMiddleware)
 	report.RegisterRoutes(r, reportHandler, authMiddleware, verifiedMiddleware)
+	message.RegisterRoutes(r, messageHandler, authMiddleware)
 
 	product.RegisterRoutes(r, productHandler, authMiddleware)
 	upload.RegisterRoutes(r, uploadHandler, authMiddleware)
