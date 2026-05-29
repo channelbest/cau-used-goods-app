@@ -80,7 +80,7 @@ func (r *Repository) UpdateAnnouncement(ctx context.Context, input UpdateAnnounc
 	if err != nil {
 		return fmt.Errorf("update announcement: %w", err)
 	}
-	return checkAnnouncementRowsAffected(result)
+	return r.checkAnnouncementRowsAffected(ctx, input.ID, result)
 }
 
 func (r *Repository) UpdateAnnouncementStatus(ctx context.Context, id uint64, status string) error {
@@ -93,7 +93,7 @@ func (r *Repository) UpdateAnnouncementStatus(ctx context.Context, id uint64, st
 	if err != nil {
 		return fmt.Errorf("update announcement status: %w", err)
 	}
-	return checkAnnouncementRowsAffected(result)
+	return r.checkAnnouncementRowsAffected(ctx, id, result)
 }
 
 func (r *Repository) CreateLog(ctx context.Context, input LogActionInput) (uint64, error) {
@@ -174,15 +174,30 @@ type messageScanner interface {
 	Scan(dest ...interface{}) error
 }
 
-func checkAnnouncementRowsAffected(result sql.Result) error {
+func (r *Repository) checkAnnouncementRowsAffected(ctx context.Context, id uint64, result sql.Result) error {
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("check announcement result: %w", err)
 	}
 	if rowsAffected == 0 {
-		return ErrAnnouncementNotFound
+		exists, err := r.announcementExists(ctx, id)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return ErrAnnouncementNotFound
+		}
 	}
 	return nil
+}
+
+func (r *Repository) announcementExists(ctx context.Context, id uint64) (bool, error) {
+	query := `SELECT COUNT(*) FROM announcements WHERE id = ?`
+	var count int
+	if err := r.db.QueryRowContext(ctx, query, id).Scan(&count); err != nil {
+		return false, fmt.Errorf("check announcement exists: %w", err)
+	}
+	return count > 0, nil
 }
 
 func (r *Repository) ListLogs(ctx context.Context, query LogQuery) ([]AdminLog, int, error) {
