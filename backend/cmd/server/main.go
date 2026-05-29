@@ -113,7 +113,7 @@ func main() {
 	product.RegisterRoutes(r, productHandler, authMiddleware)
 	upload.RegisterRoutes(r, uploadHandler, authMiddleware)
 	ai.RegisterRoutes(r, aiHandler, authMiddleware)
-	stats.RegisterRoutes(r, statsHandler, authMiddleware)
+	stats.RegisterRoutes(r, statsHandler, authMiddleware, middleware.Admin())
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	log.Printf("server listening on %s", addr)
 	if err := r.Run(addr); err != nil {

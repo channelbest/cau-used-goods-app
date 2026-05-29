@@ -67,3 +67,33 @@ func (h *Handler) ProductTrend(c *gin.Context) {
 		"list": result,
 	})
 }
+
+func (h *Handler) OrderOverview(c *gin.Context) {
+	result, err := h.service.OrderOverview(c.Request.Context())
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, response.CodeInternal, err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+func (h *Handler) UserOverview(c *gin.Context) {
+	result, err := h.service.UserOverview(c.Request.Context())
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, response.CodeInternal, err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+func (h *Handler) ReportOverview(c *gin.Context) {
+	result, err := h.service.ReportOverview(c.Request.Context())
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, response.CodeInternal, err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
