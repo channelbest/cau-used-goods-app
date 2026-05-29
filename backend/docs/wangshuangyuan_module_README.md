@@ -1,6 +1,10 @@
 # 王双媛模块开发说明文档
 
-## 一、负责信息
+## 一、负责人信息
+
+负责人：王双媛
+
+负责内容：
 
 - 消息通知模块
 - 管理员模块
@@ -60,19 +64,6 @@ backend/internal/review/handler.go
 - `ListByProduct` 从路由参数 `id` 读取商品 ID。
 - `ListBySeller` 从路由参数 `id` 读取卖家 ID。
 
-改动前：
-
-```go
-c.Param("productId")
-c.Param("sellerId")
-```
-
-改动后：
-
-```go
-c.Param("id")
-```
-
 改动目的：
 
 - 和现有路由中 `/:id` 的参数命名保持一致。
@@ -86,17 +77,6 @@ c.Param("id")
 
 ```text
 backend/internal/message/
-  handler.go
-  service.go
-  repository.go
-  router.go
-  model.go
-```
-
-入口注册：
-
-```text
-backend/cmd/server/main.go
 ```
 
 关联数据表：
@@ -117,51 +97,65 @@ PUT /messages/:id/read
 PUT /messages/read-all
 ```
 
-权限要求：
-
-- 必须登录。
-- 用户只能查看、读取自己的消息。
-- 查询他人消息或标记他人消息已读时，统一返回 `message not found`。
-
-核心逻辑：
-
-- 查询当前用户消息列表。
-- 支持按 `READ`、`UNREAD` 筛选消息。
-- 查询当前用户未读消息数量。
-- 查询当前用户自己的消息详情。
-- 标记单条消息已读。
-- 标记当前用户全部未读消息为已读。
-- 提供 `message.Service.Create(ctx, input)` 内部方法，供订单、举报、公告等后端模块创建站内消息。
-
-内部创建能力：
+已实现内部能力：
 
 ```go
-messageID, err := messageService.Create(ctx, message.CreateMessageInput{
-    ReceiverID:  buyerID,
-    SenderID:    nil,
-    MessageType: message.MessageTypeOrderConfirmed,
-    Title:       "订单已确认",
-    Content:     "卖家已确认你的预约",
-    RelatedType: ptrString(message.RelatedTypeOrder),
-    RelatedID:   &orderID,
-})
+message.Service.Create(ctx, input)
 ```
 
 说明：
 
-- `Create` 不是前端接口，不在 `router.go` 中暴露。
-- 创建出的消息默认 `read_status = UNREAD`。
-- `receiver_id`、`message_type`、`title`、`content` 必填。
-- 标题长度不超过 100，内容长度不超过 500，和数据库表结构保持一致。
-- 后续订单、举报、公告模块只需要注入 `message.Service` 即可复用消息写入能力。
+- 用户只能查看、读取自己的消息。
+- 查询他人消息或标记他人消息已读时，统一返回 `message not found`。
+- `Create` 不暴露为前端接口，供订单、举报、公告等后端模块创建站内消息。
 
-## 四、接下来负责模块说明
+### 3.2 管理员操作日志模块
 
-王双媛后续主要围绕 `admin`、`sensitive`、`stats` 三类后端能力展开。
+代码目录：
 
-### 4.1 管理员公告模块
+```text
+backend/internal/admin/
+```
 
-计划归属：
+关联数据表：
+
+```text
+admin_logs
+```
+
+已实现接口：
+
+```http
+GET /admin/logs
+```
+
+支持筛选参数：
+
+```text
+adminId
+operationType
+targetType
+targetId
+startTime
+endTime
+page
+pageSize
+```
+
+已实现内部能力：
+
+```go
+admin.Service.LogAction(ctx, input)
+```
+
+说明：
+
+- 管理员日志接口必须登录且 `role=ADMIN`。
+- `LogAction` 供公告管理、敏感词管理等模块记录管理员操作。
+
+### 3.3 管理员公告管理模块
+
+代码目录：
 
 ```text
 backend/internal/admin/
@@ -174,7 +168,7 @@ announcements
 admin_logs
 ```
 
-计划接口：
+已实现接口：
 
 ```http
 GET /admin/announcements
@@ -184,40 +178,28 @@ PUT /admin/announcements/:id/status
 DELETE /admin/announcements/:id
 ```
 
-权限要求：
+支持状态：
 
-- 必须登录。
-- 必须为管理员角色：`role=ADMIN`。
-- 路由层使用 `middleware.Admin()`。
-- 服务层保留管理员权限二次校验。
+```text
+DRAFT
+PUBLISHED
+OFFLINE
+```
 
-核心逻辑：
+说明：
 
-- 管理员创建公告。
-- 管理员编辑公告。
-- 管理员发布、下线公告。
-- 管理员逻辑删除公告。
-- 每次管理员操作写入 `admin_logs`。
+- 公告管理接口必须登录且 `role=ADMIN`。
+- 支持按状态、关键字分页查询公告。
+- 支持创建、编辑、发布、下线公告。
+- 由于 `announcements` 表没有 `is_deleted` 字段，`DELETE` 当前按下线处理，即设置 `status = OFFLINE`。
+- 新增、编辑、改状态、删除公告时写入 `admin_logs`。
 
-### 4.2 敏感词管理模块
+### 3.4 管理员敏感词管理模块
 
-现有目录：
+代码目录：
 
 ```text
 backend/internal/sensitive/
-```
-
-当前状态：
-
-- 已有 `repository.go`。
-- 已有 `service.go`。
-- 暂无管理员维护接口。
-
-计划补充：
-
-```text
-backend/internal/sensitive/handler.go
-backend/internal/sensitive/router.go
 ```
 
 关联数据表：
@@ -227,7 +209,7 @@ sensitive_words
 admin_logs
 ```
 
-计划接口：
+已实现接口：
 
 ```http
 GET /admin/sensitive-words
@@ -236,49 +218,32 @@ PUT /admin/sensitive-words/:id
 DELETE /admin/sensitive-words/:id
 ```
 
-权限要求：
-
-- 仅管理员可操作。
-- 新增、修改、删除敏感词时记录管理员操作日志。
-
-核心逻辑：
-
-- 敏感词列表查询。
-- 新增敏感词。
-- 更新敏感词状态。
-- 逻辑删除或禁用敏感词。
-
-### 4.3 管理员操作日志模块
-
-计划归属：
+支持类型：
 
 ```text
-backend/internal/admin/
+FORBIDDEN
+RISK
 ```
 
-关联数据表：
+支持状态：
 
 ```text
-admin_logs
+ENABLED
+DISABLED
 ```
 
-计划接口：
+说明：
 
-```http
-GET /admin/logs
-```
+- 敏感词管理接口必须登录且 `role=ADMIN`。
+- 支持按状态、类型、关键字分页查询敏感词。
+- 支持新增、更新、禁用敏感词。
+- 由于 `sensitive_words` 表没有 `is_deleted` 字段，`DELETE` 当前按禁用处理，即设置 `status = DISABLED`。
+- 新增、更新、禁用敏感词时写入 `admin_logs`。
+- 原有 `CheckText` 检测能力保留，仍供商品、举报等业务模块使用。
 
-权限要求：
+## 四、后续负责模块
 
-- 仅管理员可查看。
-
-核心逻辑：
-
-- 查询管理员操作记录。
-- 支持按管理员、操作类型、目标类型、时间范围分页筛选。
-- 为公告管理、敏感词管理等管理员操作提供统一日志写入方法。
-
-### 4.4 部分统计接口
+### 4.1 部分统计接口
 
 现有目录：
 
@@ -313,12 +278,9 @@ GET /stats/reports/overview
 
 建议按照以下顺序继续开发：
 
-1. 完成消息模块接口测试并提交。
-2. 完成管理员操作日志写入能力。
-3. 完成公告管理接口。
-4. 完成敏感词管理接口。
-5. 检查并调整统计接口权限。
-6. 补充接口测试和 README 说明。
+1. 完成消息模块、管理员日志模块、公告管理模块、敏感词管理模块接口测试并提交。
+2. 检查并调整统计接口权限。
+3. 补充接口测试和 README 说明。
 
 ## 六、需要注意的问题
 
@@ -335,7 +297,10 @@ GET /stats/reports/overview
 - 王双媛模块说明文档。
 - 消息模块接口实现。
 - 消息模块接口测试说明。
+- 管理员日志接口实现。
+- 管理员日志接口测试说明。
 - 管理员公告接口实现。
+- 管理员公告接口测试说明。
 - 敏感词管理接口实现。
-- 管理员日志记录实现。
+- 敏感词管理接口测试说明。
 - 统计接口权限说明或调整记录。

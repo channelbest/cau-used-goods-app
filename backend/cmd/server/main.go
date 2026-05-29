@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"cau-used-goods-app/backend/internal/admin"
 	"cau-used-goods-app/backend/internal/ai"
 	"cau-used-goods-app/backend/internal/auth"
 	"cau-used-goods-app/backend/internal/config"
@@ -15,9 +16,9 @@ import (
 	"cau-used-goods-app/backend/internal/message"
 	"cau-used-goods-app/backend/internal/middleware"
 	"cau-used-goods-app/backend/internal/order"
+	"cau-used-goods-app/backend/internal/product"
 	"cau-used-goods-app/backend/internal/report"
 	"cau-used-goods-app/backend/internal/review"
-	"cau-used-goods-app/backend/internal/product"
 	"cau-used-goods-app/backend/internal/sensitive"
 	"cau-used-goods-app/backend/internal/stats"
 	"cau-used-goods-app/backend/internal/upload"
@@ -79,6 +80,12 @@ func main() {
 	messageService := message.NewService(messageRepo)
 	messageHandler := message.NewHandler(messageService)
 
+	adminRepo := admin.NewRepository(db.DB())
+	adminService := admin.NewService(adminRepo)
+	adminHandler := admin.NewHandler(adminService)
+	sensitiveService.SetAdminLogger(adminService)
+	sensitiveHandler := sensitive.NewHandler(sensitiveService)
+
 	uploadService := upload.NewService()
 	uploadHandler := upload.NewHandler(uploadService)
 	statsRepo := stats.NewRepository(db.DB())
@@ -100,6 +107,8 @@ func main() {
 	review.RegisterRoutes(r, reviewHandler, authMiddleware, verifiedMiddleware)
 	report.RegisterRoutes(r, reportHandler, authMiddleware, verifiedMiddleware)
 	message.RegisterRoutes(r, messageHandler, authMiddleware)
+	admin.RegisterRoutes(r, adminHandler, authMiddleware, middleware.Admin())
+	sensitive.RegisterAdminRoutes(r, sensitiveHandler, authMiddleware, middleware.Admin())
 
 	product.RegisterRoutes(r, productHandler, authMiddleware)
 	upload.RegisterRoutes(r, uploadHandler, authMiddleware)
