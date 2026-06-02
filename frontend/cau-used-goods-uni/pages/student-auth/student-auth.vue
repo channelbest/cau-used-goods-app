@@ -46,7 +46,7 @@ const validateForm = () => {
 }
 
 const goHome = () => {
-  uni.navigateTo({
+  uni.switchTab({
     url: '/pages/home/home'
   })
 }

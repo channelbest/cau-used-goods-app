@@ -26,7 +26,7 @@ const loading = ref(false)
 
 const goNext = (user) => {
   if (user?.authStatus === 'VERIFIED') {
-    uni.navigateTo({
+    uni.switchTab({
       url: '/pages/home/home'
     })
     return

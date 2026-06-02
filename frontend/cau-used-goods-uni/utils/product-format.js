@@ -14,9 +14,11 @@ export function formatPrice(price) {
 
 export function formatProduct(item, categoryMap) {
   const categoryName = categoryMap && categoryMap[item.categoryId] ? categoryMap[item.categoryId] : '未分类'
-  const image = item.images && item.images.length ? normalizeImage(item.images[0]) : ''
+  const images = (item.images || []).map(normalizeImage)
+  const image = images.length ? images[0] : ''
   return {
     ...item,
+    images,
     category: categoryName,
     priceText: formatPrice(item.price),
     conditionText: item.conditionLevel || '成色未填写',
@@ -31,4 +33,19 @@ export function buildCategoryMap(categories) {
     map[item.id] = item.name
   })
   return map
+}
+
+export function withAllCategory(categories) {
+  const list = categories || []
+  return list.some((item) => Number(item.id) === 0) ? list : [{ id: 0, name: '全部' }, ...list]
+}
+
+export function getStatusText(status) {
+  const statusMap = {
+    ON_SALE: '在售',
+    LOCKED: '已被预约',
+    SOLD: '已售出',
+    OFF_SHELF: '已下架'
+  }
+  return statusMap[status] || status || '未知状态'
 }

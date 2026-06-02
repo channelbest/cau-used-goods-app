@@ -1,4 +1,4 @@
-import { request } from '../utils/request'
+import { request, uploadFile } from '../utils/request'
 
 function buildQuery(params = {}) {
   const parts = []
@@ -48,6 +48,29 @@ export const createOrder = (payload) => request({
 
 export const createReport = (payload) => request({
   url: '/reports',
+  method: 'POST',
+  data: payload
+})
+
+export const createProduct = (payload) => request({
+  url: '/products',
+  method: 'POST',
+  data: payload
+})
+
+export const uploadProductImage = (filePath) => uploadFile({
+  url: '/upload/products',
+  filePath
+})
+
+export const optimizeProductTitle = (payload) => request({
+  url: '/ai/optimize-title',
+  method: 'POST',
+  data: payload
+})
+
+export const generateProductDescription = (payload) => request({
+  url: '/ai/generate-description',
   method: 'POST',
   data: payload
 })
