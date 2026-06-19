@@ -37,27 +37,27 @@
       <text class="seller-arrow">›</text>
     </view>
 
-    <view v-if="readonlyMode" class="readonly-tip">该商品仅可查看</view>
+    <view v-if="productReadonly" class="readonly-tip">该商品仅可查看</view>
 
     <view class="bottom">
       <button
         class="icon-button favorite"
         :class="{ active: isFavorite }"
-        :disabled="readonlyMode || isOwnProduct"
+        :disabled="productReadonly || isOwnProduct"
         @click="toggleFavorite"
       >
         {{ isFavorite ? '★' : '☆' }}
       </button>
       <button
         class="icon-button report"
-        :class="{ disabled: isOwnProduct || readonlyMode }"
-        :disabled="isOwnProduct || readonlyMode"
+        :class="{ disabled: isOwnProduct || productReadonly }"
+        :disabled="isOwnProduct || productReadonly"
         @click="report"
       >
         !
       </button>
-      <button class="chat" :disabled="readonlyMode || isOwnProduct" @click="chat">聊一聊</button>
-      <button class="primary" :disabled="readonlyMode || isOwnProduct || product.status !== 'ON_SALE'" @click="reserve">
+      <button class="chat" :disabled="productReadonly || isOwnProduct" @click="chat">聊一聊</button>
+      <button class="primary" :disabled="productReadonly || isOwnProduct || product.status !== 'ON_SALE'" @click="reserve">
         {{ actionText }}
       </button>
     </view>
@@ -83,7 +83,7 @@ import { getPublicProfile } from '../../api/user'
 import { buildCategoryMap, formatPrice, formatProduct, getStatusText, normalizeImage } from '../../utils/product-format'
 import { getToken, getUser, isVerifiedUser } from '../../utils/auth'
 import { navigate } from '../../utils/navigation'
-import { displayUserName, isBannedUserStatus, isCanceledUserStatus } from '../../utils/user-format'
+import { accountStatusOf, displayUserName, isBannedUserStatus, isCanceledUserStatus, isDisabledUserStatus } from '../../utils/user-format'
 import { addBrowseHistory } from '../../utils/browse-history'
 
 const product = ref(null)
@@ -94,7 +94,12 @@ const sellerProfile = ref(null)
 const sellerAvatarFile = ref('')
 
 const pick = (...values) => values.find((value) => value !== undefined && value !== null && value !== '') || ''
-const statusText = computed(() => getStatusText(product.value?.status))
+const sellerRestricted = computed(() => {
+  const status = accountStatusOf(sellerSource.value)
+  return isBannedUserStatus(status) || isDisabledUserStatus(status) || isCanceledUserStatus(status)
+})
+const productReadonly = computed(() => readonlyMode.value || sellerRestricted.value)
+const statusText = computed(() => productReadonly.value ? '仅可查看' : getStatusText(product.value?.status))
 const favoriteCount = computed(() => Number(product.value?.favoriteCount || product.value?.favorite_count || 0))
 const visibleImages = computed(() => (product.value?.images || []).filter((image) => !failedImages.value.includes(image)))
 const sellerId = computed(() => (
@@ -134,7 +139,7 @@ const sellerAvatarText = computed(() => {
   return (sellerName.value || '卖').slice(0, 1)
 })
 const actionText = computed(() => {
-  if (readonlyMode.value) return '仅可查看'
+  if (productReadonly.value) return '仅可查看'
   if (isOwnProduct.value) return '自己的商品'
   return product.value?.status === 'ON_SALE' ? '提交预约' : statusText.value
 })
@@ -144,7 +149,7 @@ function toast(title, icon = 'none') {
 }
 
 function ensureVerified() {
-  if (readonlyMode.value) {
+  if (productReadonly.value) {
     toast('该商品仅可查看')
     return false
   }
