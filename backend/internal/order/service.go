@@ -554,7 +554,7 @@ func (s *Service) AutoExceptionClosePendingConfirmByUserTx(ctx context.Context, 
 		}
 		orders[i].ResponsibleParty = responsibleParty
 
-		description := fmt.Sprintf("auto exception close by account status change; responsibleParty=%s; reason=%s", responsibleParty, reason)
+		description := fmt.Sprintf("因用户账号状态变更，系统自动异常关闭订单；责任方=%s，原因=%s", responsibleParty, reason)
 		if err := s.exceptionCloseOrderTx(ctx, tx, orders[i], adminID, reason, ipAddress, relatedType, relatedID, description); err != nil {
 			return nil, err
 		}

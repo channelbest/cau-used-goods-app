@@ -242,6 +242,63 @@ func (r *Repository) announcementExists(ctx context.Context, id uint64) (bool, e
 	return count > 0, nil
 }
 
+func (r *Repository) GetLogByID(ctx context.Context, id uint64) (*AdminLog, error) {
+	query := `
+		SELECT l.id, l.admin_id, l.operation_type, l.target_type, l.target_id, l.description, l.ip_address,
+		       l.related_type, l.related_id, l.create_time,
+		       u.nickname, u.avatar_url
+		FROM admin_logs l
+		LEFT JOIN users u ON u.id = l.admin_id
+		WHERE l.id = ?
+	`
+	var item AdminLog
+	var description sql.NullString
+	var ipAddress sql.NullString
+	var relatedType sql.NullString
+	var relatedID sql.NullInt64
+	var adminName sql.NullString
+	var adminAvatar sql.NullString
+	if err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&item.ID,
+		&item.AdminID,
+		&item.OperationType,
+		&item.TargetType,
+		&item.TargetID,
+		&description,
+		&ipAddress,
+		&relatedType,
+		&relatedID,
+		&item.CreateTime,
+		&adminName,
+		&adminAvatar,
+	); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get admin log by id: %w", err)
+	}
+	if description.Valid {
+		item.Description = &description.String
+	}
+	if ipAddress.Valid {
+		item.IPAddress = &ipAddress.String
+	}
+	if relatedType.Valid {
+		item.RelatedType = &relatedType.String
+	}
+	if relatedID.Valid {
+		value := uint64(relatedID.Int64)
+		item.RelatedID = &value
+	}
+	if adminName.Valid {
+		item.AdminName = adminName.String
+	}
+	if adminAvatar.Valid {
+		item.AdminAvatar = adminAvatar.String
+	}
+	return &item, nil
+}
+
 func (r *Repository) ListLogs(ctx context.Context, query LogQuery) ([]AdminLog, int, error) {
 	whereSQL, args := buildLogWhere(query)
 
@@ -252,10 +309,33 @@ func (r *Repository) ListLogs(ctx context.Context, query LogQuery) ([]AdminLog, 
 	}
 
 	listSQL := `
-		SELECT id, admin_id, operation_type, target_type, target_id, description, ip_address,
-		       related_type, related_id, create_time
-		FROM admin_logs
-	` + whereSQL + ` ORDER BY create_time DESC LIMIT ? OFFSET ?`
+		SELECT l.id, l.admin_id, l.operation_type, l.target_type, l.target_id, l.description, l.ip_address,
+		       l.related_type, l.related_id, l.create_time,
+		       a.nickname, a.avatar_url,
+		       CASE
+		         WHEN l.target_type = 'USER' THEN u.nickname
+		         WHEN l.target_type = 'PRODUCT' THEN p.title
+		         ELSE NULL
+		       END as target_name,
+		       CASE
+		         WHEN l.target_type = 'USER' THEN u.college
+		         ELSE NULL
+		       END as target_college,
+		       CASE
+		         WHEN l.target_type = 'REPORT' THEN r.reason_type
+		         ELSE NULL
+		       END as report_reason,
+		       CASE
+		         WHEN l.target_type = 'REPORT' THEN ru.nickname
+		         ELSE NULL
+		       END as reporter_name
+		FROM admin_logs l
+		LEFT JOIN users a ON a.id = l.admin_id
+		LEFT JOIN users u ON u.id = l.target_id AND l.target_type = 'USER'
+		LEFT JOIN products p ON p.id = l.target_id AND l.target_type = 'PRODUCT'
+		LEFT JOIN reports r ON r.id = l.target_id AND l.target_type = 'REPORT'
+		LEFT JOIN users ru ON ru.id = r.reporter_id AND l.target_type = 'REPORT'
+	` + whereSQL + ` ORDER BY l.create_time DESC LIMIT ? OFFSET ?`
 	args = append(args, query.PageSize, (query.Page-1)*query.PageSize)
 
 	rows, err := r.db.QueryContext(ctx, listSQL, args...)
@@ -271,6 +351,12 @@ func (r *Repository) ListLogs(ctx context.Context, query LogQuery) ([]AdminLog, 
 		var ipAddress sql.NullString
 		var relatedType sql.NullString
 		var relatedID sql.NullInt64
+		var adminName sql.NullString
+		var adminAvatar sql.NullString
+		var targetName sql.NullString
+		var targetCollege sql.NullString
+		var reportReason sql.NullString
+		var reporterName sql.NullString
 		if err := rows.Scan(
 			&item.ID,
 			&item.AdminID,
@@ -282,6 +368,12 @@ func (r *Repository) ListLogs(ctx context.Context, query LogQuery) ([]AdminLog, 
 			&relatedType,
 			&relatedID,
 			&item.CreateTime,
+			&adminName,
+			&adminAvatar,
+			&targetName,
+			&targetCollege,
+			&reportReason,
+			&reporterName,
 		); err != nil {
 			return nil, 0, fmt.Errorf("scan admin log: %w", err)
 		}
@@ -297,6 +389,24 @@ func (r *Repository) ListLogs(ctx context.Context, query LogQuery) ([]AdminLog, 
 		if relatedID.Valid {
 			value := uint64(relatedID.Int64)
 			item.RelatedID = &value
+		}
+		if adminName.Valid {
+			item.AdminName = adminName.String
+		}
+		if adminAvatar.Valid {
+			item.AdminAvatar = adminAvatar.String
+		}
+		if targetName.Valid {
+			item.TargetName = targetName.String
+		}
+		if targetCollege.Valid {
+			item.TargetCollege = targetCollege.String
+		}
+		if reportReason.Valid {
+			item.ReportReason = reportReason.String
+		}
+		if reporterName.Valid {
+			item.ReporterName = reporterName.String
 		}
 		items = append(items, item)
 	}

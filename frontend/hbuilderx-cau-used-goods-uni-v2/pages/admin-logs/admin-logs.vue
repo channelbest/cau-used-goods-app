@@ -14,7 +14,7 @@
     </scroll-view>
 
     <view v-if="filteredLogs.length === 0" class="empty">暂无日志</view>
-    <view v-for="log in filteredLogs" :key="log.id" class="log-item" @click="goRelatedPage(log)">
+    <view v-for="log in filteredLogs" :key="log.id" class="log-item" @click="showLogDetail(log)">
       <view class="log-main">
         <view>
           <view class="name">{{ operationLabel(log.operationType, log) }}</view>
@@ -25,16 +25,67 @@
       <view v-if="formatDescription(log)" class="detail">{{ formatDescription(log) }}</view>
       <view v-if="sourceText(log)" class="source">{{ sourceText(log) }}</view>
     </view>
+
+    <!-- 日志详情弹窗 -->
+    <view v-if="detailVisible" class="detail-modal" @click="closeDetail">
+      <view class="detail-content" @click.stop>
+        <view class="detail-header">
+          <text class="detail-title">操作详情</text>
+          <text class="detail-close" @click="closeDetail">×</text>
+        </view>
+        <view v-if="currentLog" class="detail-body">
+          <view class="detail-row">
+            <text class="detail-label">操作类型</text>
+            <text class="detail-value">{{ operationLabel(currentLog.operationType, currentLog) }}</text>
+          </view>
+          <view class="detail-row">
+            <text class="detail-label">操作人</text>
+            <view class="detail-value">
+              <image v-if="currentLog.adminAvatar" class="admin-avatar" :src="currentLog.adminAvatar" mode="aspectFill" />
+              <text>{{ currentLog.adminName || `管理员 #${currentLog.adminId}` }}</text>
+            </view>
+          </view>
+          <view class="detail-row">
+            <text class="detail-label">操作对象</text>
+            <text class="detail-value">{{ targetDetail || `${targetLabelMap[currentLog.targetType] || currentLog.targetType} #${currentLog.targetId}` }}</text>
+          </view>
+          <view v-if="currentLog.targetType === 'USER' && currentLog.targetName" class="detail-row">
+            <text class="detail-label">被操作者</text>
+            <text class="detail-value">{{ currentLog.targetName }}（ID: {{ currentLog.targetId }}，{{ currentLog.targetCollege || '未知学院' }}）</text>
+          </view>
+          <view v-if="currentLog.targetType === 'PRODUCT' && currentLog.targetName" class="detail-row">
+            <text class="detail-label">商品名称</text>
+            <text class="detail-value">{{ currentLog.targetName }}</text>
+          </view>
+          <view v-if="currentLog.description" class="detail-row">
+            <text class="detail-label">操作说明</text>
+            <text class="detail-value">{{ formatDescription(currentLog) }}</text>
+          </view>
+          <view v-if="currentLog.relatedType && currentLog.relatedId" class="detail-row">
+            <text class="detail-label">关联来源</text>
+            <text class="detail-value">{{ targetLabelMap[currentLog.relatedType] || currentLog.relatedType }} #{{ currentLog.relatedId }}</text>
+          </view>
+          <view class="detail-row">
+            <text class="detail-label">操作时间</text>
+            <text class="detail-value">{{ formatDateTime(currentLog.createTime) }}</text>
+          </view>
+        </view>
+      </view>
+    </view>
   </view>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { getAdminLogs } from '../../api/admin'
+import { getAdminLogs, getAdminLogDetail, getAdminUserDetail, getAdminReportDetail, getAdminAppealDetail } from '../../api/admin'
+import { getProductById } from '../../api/product'
 
 const logs = ref([])
 const activeFilter = ref('ALL')
+const detailVisible = ref(false)
+const currentLog = ref(null)
+const targetDetail = ref('')
 
 const logFilters = [
   { label: '全部', value: 'ALL' },
@@ -51,6 +102,9 @@ const logFilters = [
 const operationMap = {
   USER_DISABLE: '禁用用户',
   USER_ENABLE: '启用用户',
+  USER_BAN: '永久封禁用户',
+  USER_UNBAN: '解除封禁用户',
+  USER_ROLE_CHANGE: '修改用户角色',
   PRODUCT_OFF_SHELF: '下架商品',
   PRODUCT_ON_SALE: '上架商品',
   REPORT_RESOLVE: '处理举报',
@@ -75,6 +129,7 @@ const operationMap = {
   CATEGORY_ENABLE: '启用标签',
   CATEGORY_DISABLE: '停用标签',
   ORDER_EXCEPTION_CLOSE: '异常关闭订单',
+  UPDATE_ORDER_STATUS: '修改订单状态',
   STUDENT_VERIFY_APPROVE: '通过学生认证',
   STUDENT_VERIFY_REJECT: '驳回学生认证'
 }
@@ -122,10 +177,11 @@ const descriptionMap = [
 
 const logCategory = (log) => {
   if (!log) return ''
-  if (['STUDENT_VERIFY_APPROVE', 'STUDENT_VERIFY_REJECT', 'USER_DISABLE', 'USER_ENABLE'].includes(log.operationType)) return 'USER'
+  if (['STUDENT_VERIFY_APPROVE', 'STUDENT_VERIFY_REJECT', 'USER_DISABLE', 'USER_ENABLE', 'USER_BAN', 'USER_UNBAN', 'USER_ROLE_CHANGE'].includes(log.operationType)) return 'USER'
   if (log.operationType?.includes('NOTICE')) return 'NOTICE'
   if (log.operationType?.includes('WORD')) return 'WORD'
   if (log.operationType?.includes('CATEGORY')) return 'CATEGORY'
+  if (log.operationType?.includes('ORDER')) return 'ORDER'
   return log.targetType || ''
 }
 
@@ -152,6 +208,75 @@ const load = async () => {
   }
 }
 
+const showLogDetail = async (log) => {
+  if (!log) return
+  currentLog.value = log
+  targetDetail.value = ''
+
+  // 根据操作对象类型获取详细信息
+  if (log.targetType === 'USER' && log.targetId) {
+    try {
+      const result = await getAdminUserDetail(log.targetId)
+      const data = result?.data || result
+      const user = data?.user || data
+      if (user && user.nickname) {
+        targetDetail.value = `${user.nickname}（ID: ${log.targetId}，${user.college || '未知学院'}）`
+      } else {
+        targetDetail.value = `用户 #${log.targetId}（已删除或不存在）`
+      }
+    } catch (e) {
+      console.error('获取用户详情失败', e)
+      targetDetail.value = `用户 #${log.targetId}（已删除或不存在）`
+    }
+  } else if (log.targetType === 'PRODUCT' && log.targetId) {
+    try {
+      const result = await getProductById(log.targetId)
+      const data = result?.data || result
+      if (data && data.title) {
+        targetDetail.value = `${data.title}（ID: ${log.targetId}）`
+      } else {
+        targetDetail.value = `商品 #${log.targetId}（已删除或不存在）`
+      }
+    } catch (e) {
+      console.error('获取商品详情失败', e)
+      targetDetail.value = `商品 #${log.targetId}（已删除或不存在）`
+    }
+  } else if (log.targetType === 'APPEAL' && log.targetId) {
+    try {
+      const result = await getAdminAppealDetail(log.targetId)
+      const data = result?.data || result
+      const appeal = data?.appeal || data
+      if (appeal) {
+        targetDetail.value = `申诉 #${log.targetId} - ${appeal.reason || '查看详情'}`
+      }
+    } catch (e) {
+      console.error('获取申诉详情失败', e)
+    }
+  } else if (log.targetType === 'REPORT' && log.targetId) {
+    try {
+      const result = await getAdminReportDetail(log.targetId)
+      const data = result?.data || result
+      const report = data?.report || data
+      if (report) {
+        targetDetail.value = `举报 #${log.targetId} - ${report.reason || '查看详情'}`
+      }
+    } catch (e) {
+      console.error('获取举报详情失败', e)
+    }
+  } else if (log.targetType === 'ORDER' && log.targetId) {
+    targetDetail.value = `订单 #${log.targetId}`
+  } else if (log.targetType === 'NOTICE' && log.targetId) {
+    targetDetail.value = `公告 #${log.targetId}`
+  }
+
+  detailVisible.value = true
+}
+
+const closeDetail = () => {
+  detailVisible.value = false
+  currentLog.value = null
+}
+
 const operationLabel = (value, log = null) => {
   if (value === 'STATUS_NOTICE') {
     const raw = String(log?.description || '')
@@ -175,6 +300,7 @@ const translateOperation = (value) => {
     .replaceAll('APPEAL', '申诉')
     .replaceAll('PRODUCT', '商品')
     .replaceAll('USER', '用户')
+    .replaceAll('ORDER', '订单')
     .replaceAll('_', '')
 }
 
@@ -182,6 +308,11 @@ const translateStatus = (status) => statusLabelMap[String(status || '').trim()] 
 
 const replaceKnownWords = (value) => {
   let text = String(value || '')
+  text = text.replaceAll('auto exception close by account status change', '因用户账号状态变更，系统自动异常关闭订单')
+  text = text.replaceAll('responsibleParty', '责任方')
+  text = text.replaceAll('reason', '原因')
+  text = text.replaceAll('BUYER', '买家')
+  text = text.replaceAll('SELLER', '卖家')
   Object.keys(statusLabelMap).forEach((key) => {
     text = text.replaceAll(key, statusLabelMap[key])
   })
@@ -208,17 +339,41 @@ const formatDescription = (log) => {
     case 'STATUS_NOTICE':
       return replaced || `公告${idText}状态已更新`
     case 'REPORT_HANDLE':
+    case 'MARK_REPORT_PROCESSING':
       return `举报${idText}标记为处理中`
     case 'REPORT_APPROVE':
+    case 'APPROVE_REPORT':
       return `举报${idText}已通过`
     case 'REPORT_REJECT':
+    case 'REJECT_REPORT':
       return `举报${idText}已驳回`
     case 'REPORT_CLOSE':
       return `举报${idText}已关闭`
     case 'ORDER_EXCEPTION_CLOSE':
       return replaced || `订单${idText}已异常关闭`
     case 'HANDLE_APPEAL':
+    case 'MARK_APPEAL_PROCESSING':
       return replaced || `申诉${idText}已处理`
+    case 'APPROVE_APPEAL':
+      return `申诉${idText}已通过`
+    case 'REJECT_APPEAL':
+      return `申诉${idText}已驳回`
+    case 'USER_DISABLE':
+      return `用户${idText}已被禁用`
+    case 'USER_ENABLE':
+      return `用户${idText}已恢复启用`
+    case 'USER_BAN':
+      return `用户${idText}已被永久封禁`
+    case 'USER_UNBAN':
+      return `用户${idText}已解除封禁`
+    case 'STUDENT_VERIFY_APPROVE':
+      return `学生认证${idText}已通过`
+    case 'STUDENT_VERIFY_REJECT':
+      return `学生认证${idText}已驳回`
+    case 'UPDATE_PRODUCT_STATUS':
+      return `商品${idText}状态已更新`
+    case 'UPDATE_ORDER_STATUS':
+      return `订单${idText}状态已更新`
     default:
       return replaced || `${target}${idText}已处理`
   }
@@ -239,43 +394,6 @@ const formatDateTime = (value) => {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
   }
   return String(value).replace('T', ' ').replace(/\+\d{2}:\d{2}$/, '')
-}
-
-const relatedPage = (log) => {
-  if (!log) return ''
-  if (log.targetType === 'REPORT' && log.targetId) {
-    return `/pages/admin-risk-detail/admin-risk-detail?mode=REPORT&id=${log.targetId}`
-  }
-  if (log.targetType === 'APPEAL' && log.targetId) {
-    return `/pages/admin-risk-detail/admin-risk-detail?mode=APPEAL&id=${log.targetId}`
-  }
-  if (['STUDENT_VERIFY_APPROVE', 'STUDENT_VERIFY_REJECT'].includes(log.operationType)) {
-    return '/pages/admin-students/admin-students'
-  }
-  const map = {
-    USER: '/pages/admin-users/admin-users',
-    PRODUCT: '/pages/admin-products/admin-products',
-    NOTICE: '/pages/admin-announcements/admin-announcements',
-    WORD: '/pages/admin-sensitive/admin-sensitive',
-    CATEGORY: '/pages/admin-categories/admin-categories',
-    ORDER: '/pages/admin-orders/admin-orders'
-  }
-  return withSourceQuery(map[log.targetType] || '', log)
-}
-
-const withSourceQuery = (url, log) => {
-  if (!url || !log?.relatedType || !log?.relatedId) return url
-  const separator = url.includes('?') ? '&' : '?'
-  return `${url}${separator}relatedType=${log.relatedType}&relatedId=${log.relatedId}`
-}
-
-const goRelatedPage = (log) => {
-  const url = relatedPage(log)
-  if (!url) {
-    uni.showToast({ title: '暂无对应管理页面', icon: 'none' })
-    return
-  }
-  uni.navigateTo({ url })
 }
 
 onShow(load)
@@ -360,5 +478,85 @@ onShow(load)
   color: #b2bdca;
   font-size: 42rpx;
   line-height: 42rpx;
+}
+
+/* 详情弹窗 */
+.detail-modal {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
+.detail-content {
+  width: 80%;
+  max-width: 600rpx;
+  border-radius: 24rpx;
+  background: #fff;
+  overflow: hidden;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 32rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.detail-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #1f2933;
+}
+
+.detail-close {
+  font-size: 44rpx;
+  color: #999;
+  line-height: 1;
+}
+
+.detail-body {
+  padding: 24rpx 32rpx;
+}
+
+.detail-row {
+  display: flex;
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid #f5f5f5;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  width: 160rpx;
+  flex-shrink: 0;
+  color: #667085;
+  font-size: 26rpx;
+}
+
+.detail-value {
+  flex: 1;
+  color: #1f2933;
+  font-size: 26rpx;
+  word-break: break-word;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.admin-avatar {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  background: #e8ecef;
 }
 </style>

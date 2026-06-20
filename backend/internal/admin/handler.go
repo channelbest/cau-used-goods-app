@@ -191,6 +191,28 @@ func (h *Handler) DeleteAnnouncement(c *gin.Context) {
 	response.Success(c, gin.H{"deleted": true})
 }
 
+func (h *Handler) GetLogByID(c *gin.Context) {
+	if _, ok := middleware.CurrentUserID(c); !ok {
+		response.Error(c, http.StatusUnauthorized, response.CodeUnauthorized, "unauthorized")
+		return
+	}
+
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		response.Error(c, http.StatusBadRequest, response.CodeBadRequest, "invalid log id")
+		return
+	}
+
+	role, _ := middleware.CurrentRole(c)
+	log, err := h.service.GetLogByID(c.Request.Context(), id, role == "SUPER_ADMIN")
+	if err != nil {
+		response.Error(c, http.StatusNotFound, response.CodeNotFound, err.Error())
+		return
+	}
+
+	response.Success(c, log)
+}
+
 func (h *Handler) ListLogs(c *gin.Context) {
 	if _, ok := middleware.CurrentUserID(c); !ok {
 		response.Error(c, http.StatusUnauthorized, response.CodeUnauthorized, "unauthorized")

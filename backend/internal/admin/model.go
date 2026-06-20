@@ -60,6 +60,13 @@ type AdminLog struct {
 	RelatedType   *string   `json:"relatedType,omitempty"`
 	RelatedID     *uint64   `json:"relatedId,omitempty"`
 	CreateTime    time.Time `json:"createTime"`
+	AdminName     string    `json:"adminName"`
+	AdminAvatar   string    `json:"adminAvatar"`
+	TargetName    string    `json:"targetName"`
+	TargetCollege string    `json:"targetCollege"`
+	TargetTitle   string    `json:"targetTitle"`
+	ReportReason  string    `json:"reportReason"`
+	ReporterName  string    `json:"reporterName"`
 }
 
 type LogActionInput struct {

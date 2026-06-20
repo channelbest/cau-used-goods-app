@@ -250,6 +250,23 @@ func trimOptionalString(value **string) {
 	*value = &trimmed
 }
 
+func (s *Service) GetLogByID(ctx context.Context, id uint64, includeIP bool) (*AdminLog, error) {
+	if id == 0 {
+		return nil, ErrInvalidAdminLogInput
+	}
+	log, err := s.repo.GetLogByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if log == nil {
+		return nil, errors.New("log not found")
+	}
+	if !includeIP {
+		log.IPAddress = nil
+	}
+	return log, nil
+}
+
 func (s *Service) ListLogs(ctx context.Context, query LogQuery, includeIP bool) ([]AdminLog, int, error) {
 	query.OperationType = strings.TrimSpace(query.OperationType)
 	query.TargetType = strings.TrimSpace(query.TargetType)

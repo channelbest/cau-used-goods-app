@@ -126,6 +126,18 @@ export const reviewStudentVerification = (userId, payload) => {
   })
 }
 
+export const getAdminLogDetail = (logId) => {
+  return request({ url: `/admin/logs/${logId}` })
+}
+
+export const getAdminReportDetail = (reportId) => {
+  return request({ url: `/admin/reports/${reportId}` })
+}
+
+export const getAdminAppealDetail = (appealId) => {
+  return request({ url: `/admin/appeals/${appealId}` })
+}
+
 export const getAdminLogs = () => {
   return request({
     url: '/admin/logs?page=1&pageSize=50'

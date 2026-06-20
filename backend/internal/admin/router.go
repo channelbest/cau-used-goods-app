@@ -13,5 +13,6 @@ func RegisterRoutes(r *gin.Engine, handler *Handler, authMiddleware, adminMiddle
 		group.DELETE("/announcements/:id", handler.DeleteAnnouncement)
 
 		group.GET("/logs", handler.ListLogs)
+		group.GET("/logs/:id", handler.GetLogByID)
 	}
 }

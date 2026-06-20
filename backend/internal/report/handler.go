@@ -177,6 +177,30 @@ func (h *Handler) Handle(c *gin.Context) {
 	response.Success(c, report)
 }
 
+func (h *Handler) AdminGetByID(c *gin.Context) {
+	if _, ok := middleware.CurrentUserID(c); !ok {
+		response.Error(c, http.StatusUnauthorized, response.CodeUnauthorized, "unauthorized")
+		return
+	}
+
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		response.Error(c, http.StatusBadRequest, response.CodeBadRequest, "invalid report id")
+		return
+	}
+
+	report, err := h.service.GetByID(c.Request.Context(), id)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, response.CodeInternal, err.Error())
+		return
+	}
+	if report == nil {
+		response.Error(c, http.StatusNotFound, response.CodeNotFound, "report not found")
+		return
+	}
+	response.Success(c, report)
+}
+
 func (h *Handler) Close(c *gin.Context) {
 	userID, ok := middleware.CurrentUserID(c)
 	if !ok {
