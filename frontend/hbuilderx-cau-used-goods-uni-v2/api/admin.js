@@ -76,6 +76,14 @@ export const updateAdminUserStatus = (userId, payload) => {
   })
 }
 
+export const updateAdminUserRole = (userId, payload) => {
+  return request({
+    url: `/admin/users/${userId}/role`,
+    method: 'PUT',
+    data: payload
+  })
+}
+
 export const getAdminUserProducts = (userId, params = {}) => {
   const page = params.page || 1
   const pageSize = params.pageSize || 5

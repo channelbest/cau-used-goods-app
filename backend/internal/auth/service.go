@@ -45,10 +45,10 @@ func (s *Service) DevLogin(ctx context.Context, input DevLoginInput) (*LoginResu
 		input.OpenID = "dev_openid_001"
 	}
 	if len(input.OpenID) > 64 {
-		return nil, fmt.Errorf("openid 长度不能超过 64 个字符")
+		return nil, fmt.Errorf("openid length cannot exceed 64 characters")
 	}
-	if input.Role != "" && input.Role != "USER" && input.Role != "ADMIN" {
-		return nil, fmt.Errorf("role 只能是 USER 或 ADMIN")
+	if input.Role != "" && input.Role != "USER" && input.Role != "ADMIN" && input.Role != "SUPER_ADMIN" {
+		return nil, fmt.Errorf("role can only be USER, ADMIN or SUPER_ADMIN")
 	}
 
 	result, err := s.loginByOpenID(ctx, input.OpenID)
@@ -74,10 +74,10 @@ func (s *Service) DevLogin(ctx context.Context, input DevLoginInput) (*LoginResu
 func (s *Service) WechatLogin(ctx context.Context, code string) (*LoginResult, error) {
 	code = strings.TrimSpace(code)
 	if code == "" {
-		return nil, fmt.Errorf("微信登录 code 不能为空")
+		return nil, fmt.Errorf("wechat login code cannot be empty")
 	}
 	if len(code) > 128 {
-		return nil, fmt.Errorf("code 长度不能超过 128 个字符")
+		return nil, fmt.Errorf("code length cannot exceed 128 characters")
 	}
 
 	openid, err := s.fetchWechatOpenID(ctx, code)
@@ -132,25 +132,25 @@ func (s *Service) loginByOpenID(ctx context.Context, openid string) (*LoginResul
 
 func (s *Service) Reactivate(ctx context.Context, token string, confirmed bool) (*LoginResult, error) {
 	if !confirmed {
-		return nil, fmt.Errorf("必须确认重新激活账号")
+		return nil, fmt.Errorf("reactivation confirmation is required")
 	}
 	token = strings.TrimSpace(token)
 	if token == "" {
-		return nil, fmt.Errorf("reactivationToken 不能为空")
+		return nil, fmt.Errorf("reactivationToken is required")
 	}
 	claims, err := jwtutil.Parse(s.jwt.Secret, token)
 	if err != nil || claims.TokenType != jwtutil.TokenTypeReactivate {
-		return nil, fmt.Errorf("恢复凭证无效或已过期")
+		return nil, fmt.Errorf("invalid or expired reactivation token")
 	}
 	current, err := s.repo.FindByIDIncludingDeleted(ctx, claims.UserID)
 	if err != nil {
 		return nil, err
 	}
 	if current == nil || current.TokenVersion != claims.TokenVersion {
-		return nil, fmt.Errorf("恢复凭证无效或已过期")
+		return nil, fmt.Errorf("invalid or expired reactivation token")
 	}
 	if s.reactivator == nil {
-		return nil, fmt.Errorf("账号恢复服务不可用")
+		return nil, fmt.Errorf("reactivation service is unavailable")
 	}
 	if err := s.reactivator.ReactivateAccount(ctx, claims.UserID); err != nil {
 		return nil, err
@@ -160,7 +160,7 @@ func (s *Service) Reactivate(ctx context.Context, token string, confirmed bool) 
 		return nil, err
 	}
 	if user == nil {
-		return nil, fmt.Errorf("用户不存在")
+		return nil, fmt.Errorf("user not found")
 	}
 	accessToken, err := jwtutil.Generate(s.jwt.Secret, s.jwt.ExpireHours, user.ID, user.Role, user.TokenVersion)
 	if err != nil {
@@ -179,7 +179,7 @@ type wechatSessionResp struct {
 
 func (s *Service) fetchWechatOpenID(ctx context.Context, code string) (string, error) {
 	if s.wechat.AppID == "" || s.wechat.AppSecret == "" {
-		return "", fmt.Errorf("微信小程序配置不完整")
+		return "", fmt.Errorf("wechat appid or secret is not configured")
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.weixin.qq.com/sns/jscode2session", nil)
@@ -205,10 +205,10 @@ func (s *Service) fetchWechatOpenID(ctx context.Context, code string) (string, e
 		return "", fmt.Errorf("decode wechat response: %w", err)
 	}
 	if result.ErrCode != 0 {
-		return "", fmt.Errorf("微信登录失败，请重新授权")
+		return "", fmt.Errorf("wechat login failed: %s", result.ErrMsg)
 	}
 	if result.OpenID == "" {
-		return "", fmt.Errorf("微信登录未返回用户标识")
+		return "", fmt.Errorf("wechat openid is empty")
 	}
 	return result.OpenID, nil
 }

@@ -27,12 +27,12 @@
         {{ item.label }}
       </view>
     </view>
-    <view class="filters">
+    <view v-if="isSuperAdmin" class="filters">
       <view
-        v-for="item in userScopeOptions"
+        v-for="item in roleOptions"
         :key="item.value"
-        :class="['chip', filters.userScope === item.value ? 'active' : '']"
-        @click="setFilter('userScope', item.value)"
+        :class="['chip', filters.role === item.value ? 'active' : '']"
+        @click="setFilter('role', item.value)"
       >
         {{ item.label }}
       </view>
@@ -57,7 +57,8 @@
         <button class="mini" @click="goStudentAuth(item)">认证状态</button>
         <button v-if="item.accountStatus !== 'DISABLED'" class="mini warn" @click="changeStatus(item, 'DISABLED')">禁用</button>
         <button v-if="item.accountStatus !== 'BANNED'" class="mini danger" @click="changeStatus(item, 'BANNED')">封禁</button>
-        <button v-if="item.accountStatus !== 'NORMAL'" class="mini ok" @click="changeStatus(item, 'NORMAL')">恢复</button>
+        <button v-if="canRecoverUser(item)" class="mini ok" @click="changeStatus(item, 'NORMAL')">{{ recoverButtonText(item) }}</button>
+        <button v-if="canChangeRole(item)" class="mini role" @click="changeRole(item)">{{ roleActionText(item) }}</button>
       </view>
 
       <view v-if="expandedId === item.id" class="related">
@@ -103,8 +104,10 @@ import {
   getAdminUserProducts,
   getAdminUserOrders,
   getAdminUserReports,
-  updateAdminUserStatus
+  updateAdminUserStatus,
+  updateAdminUserRole
 } from '../../api/admin'
+import { getUser } from '../../utils/auth'
 
 const users = ref([])
 const loading = ref(false)
@@ -114,7 +117,7 @@ const total = ref(0)
 const expandedId = ref(null)
 const detail = ref({})
 const related = ref({ products: [], orders: [], reports: [] })
-const filters = ref({ keyword: '', accountStatus: '', authStatus: '', userScope: 'ALL' })
+const filters = ref({ keyword: '', accountStatus: '', authStatus: '', role: '' })
 
 const accountOptions = [
   { label: '全部状态', value: '' },
@@ -129,11 +132,14 @@ const authOptions = [
   { label: '已认证', value: 'VERIFIED' },
   { label: '已驳回', value: 'REJECTED' }
 ]
-const userScopeOptions = [
-  { label: '全部用户', value: 'ALL' },
-  { label: '仅业务用户', value: 'BUSINESS' }
+const roleOptions = [
+  { label: '全部角色', value: '' },
+  { label: '普通用户', value: 'USER' },
+  { label: '管理员', value: 'ADMIN' }
 ]
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
+const currentUserRole = computed(() => String(getUser()?.role || '').toUpperCase())
+const isSuperAdmin = computed(() => currentUserRole.value === 'SUPER_ADMIN')
 
 function setFilter(key, value) {
   filters.value[key] = value
@@ -149,21 +155,12 @@ function reload() {
 async function loadUsers() {
   loading.value = true
   try {
-    const { userScope, ...query } = filters.value
+    const query = { ...filters.value }
+    if (!isSuperAdmin.value) {
+      delete query.role
+    }
     const result = await getAdminUsers({ ...query, page: page.value, pageSize })
     const rawUsers = result?.items || []
-    if (userScope === 'BUSINESS') {
-      const details = await Promise.all(rawUsers.map(async (item) => {
-        try {
-          return await getAdminUserDetail(item.id)
-        } catch (error) {
-          return null
-        }
-      }))
-      users.value = rawUsers.filter((item, index) => isBusinessUser(item, details[index]))
-      total.value = users.value.length
-      return
-    }
     users.value = rawUsers
     total.value = Number(result?.total || rawUsers.length)
   } catch (error) {
@@ -175,25 +172,6 @@ async function loadUsers() {
 
 function userName(item) {
   return item.nickname || item.realName || '微信用户'
-}
-
-function hasProfileData(item) {
-  return Boolean(item.nickname || item.realName || item.studentId || item.college || item.phone || item.avatarUrl || item.authStatus === 'VERIFIED' || item.authStatus === 'PENDING')
-}
-
-function isBusinessUser(item, itemDetail) {
-  if (!item || item.role === 'ADMIN' || item.role === 'SUPER_ADMIN') return false
-  if (hasProfileData(item)) return true
-  const stats = itemDetail?.stats || {}
-  return Boolean(
-    stats.productCount ||
-    stats.orderCount ||
-    stats.reportSubmittedCount ||
-    stats.reportedCount ||
-    stats.appealCount ||
-    stats.reviewGivenCount ||
-    stats.reviewReceivedCount
-  )
 }
 
 function firstChar(item) {
@@ -210,6 +188,33 @@ function authText(status) {
 
 function accountText(status) {
   return { NORMAL: '正常', DISABLED: '禁用', BANNED: '封禁', CANCELED: '已注销' }[status] || status || '未知'
+}
+
+function canRecoverUser(item) {
+  if (!item) return false
+  if (item.accountStatus === 'DISABLED') return true
+  if (item.accountStatus === 'BANNED') return isSuperAdmin.value
+  return false
+}
+
+function recoverButtonText(item) {
+  return item?.accountStatus === 'BANNED' ? '解封' : '恢复'
+}
+
+function canChangeRole(item) {
+  return isSuperAdmin.value && (item?.role === 'USER' || item?.role === 'ADMIN')
+}
+
+function nextRole(item) {
+  return item?.role === 'ADMIN' ? 'USER' : 'ADMIN'
+}
+
+function roleActionText(item) {
+  return nextRole(item) === 'ADMIN' ? '调整为管理员' : '调整为普通用户'
+}
+
+function roleTargetText(item) {
+  return nextRole(item) === 'ADMIN' ? '管理员' : '普通用户'
 }
 
 function productStatusText(status) {
@@ -281,6 +286,26 @@ function changeStatus(item, status) {
         loadUsers()
       } catch (error) {
         uni.showToast({ title: error.message || '操作失败', icon: 'none' })
+      }
+    }
+  })
+}
+
+function changeRole(item) {
+  if (!canChangeRole(item)) return
+  const targetRole = nextRole(item)
+  const targetText = roleTargetText(item)
+  uni.showModal({
+    title: '调整角色',
+    content: `确认将 ${userName(item)} 的角色调整为 ${targetText}？`,
+    success: async (res) => {
+      if (!res.confirm) return
+      try {
+        await updateAdminUserRole(item.id, { role: targetRole, reason: `超级管理员调整角色为${targetText}` })
+        uni.showToast({ title: '角色调整成功', icon: 'success' })
+        loadUsers()
+      } catch (error) {
+        uni.showToast({ title: error.message || '角色调整失败', icon: 'none' })
       }
     }
   })

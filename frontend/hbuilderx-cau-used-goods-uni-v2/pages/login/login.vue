@@ -34,10 +34,11 @@ const openid = ref(uni.getStorageSync('dev-login-openid') || '')
 const accounts = [
   { label: '用户 A', openid: 'frontend_a_dev_user' },
   { label: '用户 B', openid: 'frontend_b_dev_user' },
-  { label: '管理员', openid: 'admin_dev_user' },
+  { label: '管理员', openid: 'admin_dev_user', role: 'ADMIN' },
+  { label: '超级管理员', openid: 'super_admin_dev_user', role: 'SUPER_ADMIN' },
   { label: '待认证', openid: 'pending_dev_user' }
 ]
-const adminOpenids = ['admin_dev_user']
+const adminOpenids = ['admin_dev_user', 'super_admin_dev_user']
 
 function isAdminLogin(value, user = {}) {
   const role = String(user.role || user.userRole || user.user_role || user.type || user.userType || user.user_type || '').toUpperCase()
@@ -46,6 +47,10 @@ function isAdminLogin(value, user = {}) {
 
 function selectAccount(value) {
   openid.value = value
+}
+
+function selectedAccount() {
+  return accounts.find((account) => account.openid === openid.value.trim())
 }
 
 function goHome() {
@@ -65,10 +70,12 @@ async function handleDevLogin() {
   if (loading.value) return
   loading.value = true
   try {
-    const result = await devLogin({ openid: value })
+    const account = selectedAccount()
+    const payload = account?.role ? { openid: value, role: account.role } : { openid: value }
+    const result = await devLogin(payload)
     uni.setStorageSync('dev-login-openid', value)
     if (isAdminLogin(value, result?.user)) {
-      result.user = { ...(result.user || {}), role: 'ADMIN' }
+      result.user = { ...(result.user || {}), role: account?.role || result?.user?.role || 'ADMIN' }
     }
     saveLoginResult(result)
     uni.showToast({ title: '登录成功', icon: 'success' })
