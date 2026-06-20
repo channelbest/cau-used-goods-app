@@ -80,6 +80,7 @@ type UpdateAccountStatusInput struct {
 
 type AccountStatusChangeEffects struct {
 	ClosedOrders []order.AccountStatusClosedOrder
+	OffShelfProducts []uint64
 }
 
 type UpdateRoleInput struct {
@@ -254,13 +255,13 @@ func (s *Service) notifyAccountStatusChange(ctx context.Context, adminID uint64,
 		SenderID:    &adminID,
 		MessageType: message.MessageTypeSystemNotice,
 		Title:       "账号状态变更",
-		Content:     buildAccountStatusMessage(input.AccountStatus, input.Reason),
+		Content:     buildAccountStatusMessage(input.AccountStatus, input.Reason, effects),
 		RelatedType: &relatedType,
 		RelatedID:   &relatedID,
 	})
 }
 
-func buildAccountStatusMessage(status string, reason string) string {
+func buildAccountStatusMessage(status string, reason string, effects *AccountStatusChangeEffects) string {
 	var content string
 	switch status {
 	case accountStatusDisabled:
@@ -271,6 +272,14 @@ func buildAccountStatusMessage(status string, reason string) string {
 		content = fmt.Sprintf("你的账号状态已恢复正常，原因：%s", reason)
 	default:
 		content = fmt.Sprintf("你的账号状态已变更为 %s，原因：%s", status, reason)
+	}
+	if effects != nil {
+		if len(effects.OffShelfProducts) > 0 {
+			content += fmt.Sprintf("；你发布的 %d 件商品已被下架", len(effects.OffShelfProducts))
+		}
+		if len(effects.ClosedOrders) > 0 {
+			content += fmt.Sprintf("；%d 个进行中的订单已被关闭", len(effects.ClosedOrders))
+		}
 	}
 	return limitRunes(content, 500)
 }

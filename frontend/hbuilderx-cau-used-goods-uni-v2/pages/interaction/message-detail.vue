@@ -1,15 +1,39 @@
 <template>
   <view v-if="message" class="page">
-    <view v-if="isStudentAuthResult" class="hero auth-hero">
-      <text class="auth-title">{{ studentAuthPassed ? '学生认证通过' : '学生认证未通过' }}</text>
-    </view>
-    <view v-else-if="isPlainNotice" class="hero notice-hero">
-      <text class="hero-title">{{ noticeTitle }}</text>
+    <view class="hero" :class="{ 'auth-hero': isStudentAuthResult || isAccountStatusChange, 'notice-hero': isPlainNotice }">
+      <template v-if="isStudentAuthResult">
+        <text class="auth-title">{{ studentAuthPassed ? '学生认证通过' : '学生认证未通过' }}</text>
+      </template>
+      <template v-else-if="isAccountStatusChange">
+        <text class="auth-title">{{ accountStatusTitle }}</text>
+      </template>
+      <template v-else-if="isPlainNotice">
+        <text class="hero-title">{{ noticeTitle }}</text>
+      </template>
+      <template v-else>
+        <text class="eyebrow">SYSTEM MESSAGE</text>
+        <text class="hero-title">消息详情</text>
+        <text class="hero-copy">查看订单进度、举报处理和平台通知的完整内容</text>
+      </template>
     </view>
 
     <view v-if="isStudentAuthResult" class="auth-actions">
       <button v-if="studentAuthPassed" class="btn primary" @click="goHome">逛首页</button>
       <button v-else class="btn primary" @click="goAppeal">去申诉</button>
+    </view>
+
+    <view v-else-if="isAccountStatusChange" class="account-status-content">
+      <view class="status-reason">
+        <text class="reason-label">原因</text>
+        <text class="reason-value">{{ accountStatusReason }}</text>
+        <text class="reason-hint">涉及的所有交易都被关闭</text>
+      </view>
+      <view v-if="hasRelatedTransactions" class="transactions-hint">
+        <text class="hint-text">{{ transactionHint }}</text>
+      </view>
+      <view class="auth-actions">
+        <button class="btn primary" @click="goAppeal">去申诉</button>
+      </view>
     </view>
 
     <template v-else>
@@ -66,6 +90,41 @@ const isStudentAuthResult = computed(() => (
   || String(message.value?.content || '').includes('学生认证未通过')
 ))
 const studentAuthPassed = computed(() => isStudentAuthResult.value && !String(message.value?.content || '').includes('未通过'))
+const isAccountStatusChange = computed(() => (
+  message.value?.title === '账号状态变更'
+  || String(message.value?.content || '').includes('账号已被')
+  || String(message.value?.content || '').includes('已被临时禁用')
+  || String(message.value?.content || '').includes('已被永久封禁')
+))
+const accountStatusTitle = computed(() => {
+  const content = String(message.value?.content || '')
+  if (content.includes('永久封禁')) return '账号已被永久封禁'
+  if (content.includes('临时禁用') || content.includes('已被禁用')) return '账号已被临时禁用'
+  return '账号状态已变更'
+})
+const accountStatusReason = computed(() => {
+  const content = String(message.value?.content || '')
+  const match = content.match(/原因[：:]\s*(.+)/)
+  return match ? match[1] : content
+})
+const hasRelatedTransactions = computed(() => {
+  const content = String(message.value?.content || '')
+  if (content.includes('商品') || content.includes('订单') || content.includes('交易')) return true
+  // 检查是否有相关商品或订单数据
+  const product = message.value?.product || message.value?.relatedProduct
+  const order = message.value?.order || message.value?.relatedOrder
+  return !!(product || order)
+})
+const transactionHint = computed(() => {
+  const content = String(message.value?.content || '')
+  const parts = []
+  const productMatch = content.match(/(\d+)\s*件商品已被下架/)
+  if (productMatch) parts.push(`你发布的 ${productMatch[1]} 件商品已被下架`)
+  const orderMatch = content.match(/(\d+)\s*个进行中的订单已被关闭/)
+  if (orderMatch) parts.push(`${orderMatch[1]} 个进行中的订单已被关闭`)
+  if (parts.length === 0) return '目前涉及的交易已被关闭'
+  return '目前涉及的交易已被关闭，包括：' + parts.join('，')
+})
 const statusLabel = computed(() => statusText(message.value?.status || message.value?.readStatus || (message.value?.read ? 'READ' : 'UNREAD')))
 const statusClass = computed(() => statusClassByValue(message.value?.status || message.value?.readStatus || (message.value?.read ? 'READ' : 'UNREAD')))
 const isPlainNotice = computed(() => !hasConcreteRelated(message.value || {}))
@@ -282,6 +341,13 @@ function goAppeal() {
 .result-value { color: #26342f; font-size: 26rpx; line-height: 1.6; text-align: right; }
 .actions { display: flex; gap: 18rpx; margin-top: 28rpx; }
 .auth-actions { margin-top: 34rpx; }
+.account-status-content { margin-top: 34rpx; }
+.status-reason { padding: 30rpx; border-radius: 24rpx; background: #fff; box-shadow: 0 10rpx 30rpx rgba(28,68,52,.06); }
+.reason-label { display: block; color: #667085; font-size: 24rpx; margin-bottom: 12rpx; }
+.reason-value { display: block; color: #26342f; font-size: 30rpx; font-weight: 700; line-height: 1.5; }
+.reason-hint { display: block; margin-top: 16rpx; color: #89938f; font-size: 24rpx; }
+.transactions-hint { margin-top: 20rpx; padding: 20rpx 30rpx; }
+.hint-text { color: #89938f; font-size: 24rpx; line-height: 1.6; }
 .btn { flex: 1; height: 78rpx; line-height: 78rpx; border-radius: 999rpx; font-size: 26rpx; }
 .btn::after { border: 0; }
 .primary { background: #23734f; color: #fff; }

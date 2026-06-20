@@ -99,6 +99,7 @@ func (r *Repository) ChangeAccountStatus(
 		if err != nil {
 			return nil, err
 		}
+		effects.OffShelfProducts = productIDs
 		for _, productID := range productIDs {
 			description := fmt.Sprintf("off shelf product due account status %s: %s", input.AccountStatus, input.Reason)
 			if _, err := adminLogger.LogActionTx(ctx, tx, admin.LogActionInput{
