@@ -54,7 +54,6 @@
 
       <view class="actions">
         <button class="mini" @click="toggleRelated(item)">关联信息</button>
-        <button class="mini" @click="goStudentAuth(item)">认证状态</button>
         <button v-if="item.accountStatus === 'NORMAL'" class="mini warn" @click="changeStatus(item, 'DISABLED')">禁用</button>
         <button v-if="item.accountStatus === 'NORMAL' || item.accountStatus === 'DISABLED'" class="mini danger" @click="changeStatus(item, 'BANNED')">封禁</button>
         <button v-if="canRecoverUser(item)" class="mini ok" @click="changeStatus(item, 'NORMAL')">{{ recoverButtonText(item) }}</button>
@@ -244,15 +243,11 @@ function reportReasonText(reasonType) {
 }
 
 function openUserHome(item) {
-  uni.navigateTo({ url: `/pages/user-profile/user-profile?id=${item.id}` })
+  uni.navigateTo({ url: `/pages/user-profile/user-profile?id=${item.id}&adminView=1` })
 }
 
 function openProduct(item) {
   uni.navigateTo({ url: `/pages/detail/detail?id=${item.id}` })
-}
-
-function goStudentAuth(item) {
-  uni.showToast({ title: `学生认证：${authText(item.authStatus)}`, icon: 'none' })
 }
 
 async function toggleRelated(item) {

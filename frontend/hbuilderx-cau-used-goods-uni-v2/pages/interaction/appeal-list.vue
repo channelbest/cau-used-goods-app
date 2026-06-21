@@ -5,7 +5,6 @@
         <view class="title">我的申诉</view>
         <view class="subtitle">查看申诉进度和处理结果</view>
       </view>
-      <button class="submit-button" @click="createAppeal">提交申诉</button>
     </view>
 
     <view v-if="appeals.length" class="list">
@@ -22,7 +21,7 @@
       </view>
     </view>
 
-    <EmptyState v-else title="暂无申诉记录" detail="提交申诉后，处理进度会显示在这里" />
+    <EmptyState v-else title="暂无申诉记录" detail="从相关账号、商品或订单问题入口提交申诉后，处理进度会显示在这里" />
   </view>
 </template>
 
@@ -77,9 +76,6 @@ function openDetail(appeal) {
   navigate('/pages/interaction/appeal-detail', { id: appeal.id })
 }
 
-function createAppeal() {
-  navigate('/pages/interaction/appeal')
-}
 </script>
 
 <style scoped lang="scss">
@@ -87,7 +83,6 @@ function createAppeal() {
 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; margin-bottom: 22rpx; padding: 24rpx; border-radius: 20rpx; background: #fff; }
 .title { color: #243129; font-size: 34rpx; font-weight: 800; }
 .subtitle { margin-top: 8rpx; color: #8d9892; font-size: 24rpx; }
-.submit-button { flex-shrink: 0; height: 66rpx; padding: 0 24rpx; border-radius: 999rpx; background: #23734f; color: #fff; font-size: 25rpx; line-height: 66rpx; }
 .list { display: flex; flex-direction: column; gap: 18rpx; }
 .appeal { display: flex; gap: 14rpx; padding: 24rpx; border-radius: 18rpx; background: #fff; }
 .dot { width: 16rpx; height: 16rpx; margin-top: 10rpx; flex: 0 0 16rpx; border-radius: 50%; background: #f2a23a; }

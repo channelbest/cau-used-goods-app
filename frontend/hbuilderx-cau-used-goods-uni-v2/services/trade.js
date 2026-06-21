@@ -146,7 +146,7 @@ async function getOrderWithImage(id) {
 export const tradeService = {
   getProduct: async (id) => normalizeProduct(await api.getProduct(id)),
   createAppointment: async (data) => normalizeOrder(await api.createAppointment(data)),
-  getOrders: async (role) => (await api.getOrders(role)).items.map(normalizeOrder),
+  getOrders: async (role, params = {}) => (await api.getOrders(role, params)).items.map(normalizeOrder),
   getOrder: getOrderWithImage,
   getAdminOrder: async (id) => {
     const result = await getAdminOrders('ALL', { pageSize: 200 })

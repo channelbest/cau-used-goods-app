@@ -15,13 +15,6 @@
           </view>
         </view>
       </view>
-      <view v-if="adminView" class="actions">
-        <template>
-          <button v-if="accountStatus === 'NORMAL'" class="disable-btn" @click="changeUserStatus('DISABLED')">禁用</button>
-          <button v-if="accountStatus === 'NORMAL' || accountStatus === 'DISABLED'" class="ban-btn" @click="changeUserStatus('BANNED')">封禁</button>
-          <button v-if="canRecoverUser" class="recover-btn" @click="changeUserStatus('NORMAL')">{{ recoverButtonText }}</button>
-        </template>
-      </view>
     </view>
 
     <view class="section">
@@ -64,7 +57,7 @@
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getPublicProfile } from '../../api/user'
-import { getAdminUserDetail, updateAdminUserStatus } from '../../api/admin'
+import { getAdminUserDetail } from '../../api/admin'
 import { listProducts } from '../../api/product'
 import { getUser } from '../../utils/auth'
 import { BASE_URL } from '../../utils/request'
@@ -73,8 +66,6 @@ import { accountStatusOf, isBannedUserStatus, isDisabledUserStatus } from '../..
 
 const userId = ref('')
 const adminView = ref(false)
-const relatedType = ref('')
-const relatedId = ref('')
 const profile = ref(null)
 const adminUser = ref(null)
 const products = ref([])
@@ -91,12 +82,6 @@ const currentUserRestrictionText = computed(() => {
 })
 const displayName = computed(() => profile.value?.nickname || 'CAU 同学')
 const avatarUrl = computed(() => normalizeImage(profile.value?.avatarUrl))
-const accountStatus = computed(() => adminUser.value?.accountStatus || (profile.value?.tradeAvailable ? 'NORMAL' : 'DISABLED'))
-const currentUserRole = computed(() => String(getUser()?.role || '').toUpperCase())
-const isSuperAdmin = computed(() => currentUserRole.value === 'SUPER_ADMIN')
-const hasAppealContext = computed(() => relatedType.value === 'APPEAL' && Number(relatedId.value) > 0)
-const canRecoverUser = computed(() => accountStatus.value === 'DISABLED' || (accountStatus.value === 'BANNED' && isSuperAdmin.value && hasAppealContext.value))
-const recoverButtonText = computed(() => accountStatus.value === 'BANNED' ? '解封' : '恢复')
 
 function normalizeImage(url) {
   if (!url) return ''
@@ -146,8 +131,6 @@ function profileFromAdminUser(user) {
 onLoad(async (options) => {
   userId.value = options.id || ''
   adminView.value = options.adminView === '1' || options.adminView === 1
-  relatedType.value = String(options.relatedType || '').toUpperCase()
-  relatedId.value = options.relatedId || ''
   if (!userId.value) {
     showError(new Error('用户不存在'))
     return
@@ -184,45 +167,6 @@ function reportUser() {
   navigate('/pages/interaction/report', { targetType: 'USER', targetId: userId.value })
 }
 
-function accountText(status) {
-  return { NORMAL: '恢复', DISABLED: '禁用', BANNED: '封禁' }[status] || status
-}
-
-function changeUserStatus(status) {
-  const action = accountText(status)
-  uni.showModal({
-    title: `${action}用户`,
-    editable: true,
-    placeholderText: '请输入处理原因',
-    success: async (res) => {
-      if (!res.confirm) return
-      const reason = (res.content || '').trim()
-      if (!reason) {
-        uni.showToast({ title: '请填写处理原因', icon: 'none' })
-        return
-      }
-      try {
-        const payload = { accountStatus: status, reason }
-        if (relatedType.value && relatedId.value) {
-          payload.relatedType = relatedType.value
-          payload.relatedId = Number(relatedId.value)
-        }
-        await updateAdminUserStatus(userId.value, payload)
-        const detail = await getAdminUserDetail(userId.value).catch(() => null)
-        adminUser.value = detail?.user || adminUser.value
-        if (status === 'NORMAL') {
-          profile.value = { ...profile.value, tradeAvailable: true }
-        } else {
-          profile.value = { ...profile.value, tradeAvailable: false }
-        }
-        uni.showToast({ title: '操作成功', icon: 'success' })
-      } catch (error) {
-        uni.showToast({ title: error.message || '操作失败', icon: 'none' })
-      }
-    }
-  })
-}
-
 </script>
 
 <style scoped>
@@ -241,11 +185,6 @@ function changeUserStatus(status) {
 .tag.danger { background: #fff1ef; color: #d85c45; }
 .report-inline { flex-shrink: 0; height: 54rpx; margin: 0 0 0 auto; padding: 0 18rpx; border-radius: 999rpx; background: #fff1ef; color: #d85c45; font-size: 22rpx; line-height: 54rpx; }
 .report-inline::after { border: 0; }
-.actions { display: flex; gap: 16rpx; margin-top: 28rpx; }
-.disable-btn, .ban-btn, .recover-btn { flex: 1; height: 72rpx; border-radius: 999rpx; font-size: 26rpx; line-height: 72rpx; }
-.disable-btn { background: #fff7e6; color: #a96500; }
-.ban-btn { background: #fff1f2; color: #ef4444; }
-.recover-btn { background: #e7f4ec; color: #23734f; }
 .section { margin-top: 22rpx; padding: 26rpx; }
 .section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 20rpx; }
 .section-title { color: #202124; font-size: 31rpx; font-weight: 800; }
