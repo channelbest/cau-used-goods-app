@@ -68,8 +68,12 @@ func main() {
 	productService := product.NewService(productRepo, sensitiveService, adminService, messageService)
 	productHandler := product.NewHandler(productService)
 
+	chatRepo := chat.NewRepository(db.DB())
+	chatService := chat.NewService(chatRepo)
+	chatHandler := chat.NewHandler(chatService)
+
 	orderRepo := order.NewRepository(db.DB())
-	orderService := order.NewService(orderRepo, messageService, adminService)
+	orderService := order.NewService(orderRepo, chatService, adminService)
 	orderHandler := order.NewHandler(orderService)
 
 	userRepo := user.NewRepository(db.DB())
@@ -91,10 +95,6 @@ func main() {
 	reportRepo := report.NewRepository(db.DB())
 	reportService := report.NewService(reportRepo, sensitiveService, messageService, adminService)
 	reportHandler := report.NewHandler(reportService)
-
-	chatRepo := chat.NewRepository(db.DB())
-	chatService := chat.NewService(chatRepo)
-	chatHandler := chat.NewHandler(chatService)
 
 	appealRepo := appeal.NewRepository(db.DB())
 	appealService := appeal.NewService(appealRepo, adminService, messageService)

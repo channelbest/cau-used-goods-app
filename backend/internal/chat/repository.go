@@ -70,6 +70,27 @@ func (r *Repository) CreateConversation(ctx context.Context, productID, buyerID,
 	return r.GetConversationByID(ctx, uint64(id))
 }
 
+func (r *Repository) EnsureConversation(ctx context.Context, productID, buyerID, sellerID uint64) (*Conversation, error) {
+	result, err := r.db.ExecContext(ctx, `
+		INSERT INTO chat_conversations (product_id, buyer_id, seller_id, status)
+		VALUES (?, ?, ?, ?)
+		ON DUPLICATE KEY UPDATE
+			id = LAST_INSERT_ID(id),
+			status = VALUES(status),
+			buyer_hidden_at = NULL,
+			seller_hidden_at = NULL,
+			update_time = CURRENT_TIMESTAMP
+	`, productID, buyerID, sellerID, ConversationStatusActive)
+	if err != nil {
+		return nil, fmt.Errorf("ensure conversation: %w", err)
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("get ensured conversation id: %w", err)
+	}
+	return r.GetConversationByID(ctx, uint64(id))
+}
+
 func (r *Repository) ListConversations(ctx context.Context, userID uint64, page, pageSize int) ([]ConversationDetail, int, error) {
 	var total int
 	if err := r.db.QueryRowContext(ctx, `
@@ -145,7 +166,8 @@ func (r *Repository) ListMessages(ctx context.Context, conversationID uint64, pa
 
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id, conversation_id, sender_id, receiver_id, content, message_type,
-			read_status, DATE_FORMAT(create_time, '%Y-%m-%d %H:%i:%s')
+			actor_type, order_id, event_type, read_status,
+			DATE_FORMAT(create_time, '%Y-%m-%d %H:%i:%s')
 		FROM chat_messages
 		WHERE conversation_id = ?
 		ORDER BY create_time ASC, id ASC
@@ -159,12 +181,16 @@ func (r *Repository) ListMessages(ctx context.Context, conversationID uint64, pa
 	items := make([]Message, 0)
 	for rows.Next() {
 		var item Message
+		var senderID, receiverID, orderID sql.NullInt64
+		var eventType sql.NullString
 		if err := rows.Scan(
-			&item.ID, &item.ConversationID, &item.SenderID, &item.ReceiverID,
-			&item.Content, &item.MessageType, &item.ReadStatus, &item.CreateTime,
+			&item.ID, &item.ConversationID, &senderID, &receiverID,
+			&item.Content, &item.MessageType, &item.ActorType, &orderID, &eventType,
+			&item.ReadStatus, &item.CreateTime,
 		); err != nil {
 			return nil, 0, fmt.Errorf("scan chat message: %w", err)
 		}
+		fillMessageNullableFields(&item, senderID, receiverID, orderID, eventType)
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
@@ -181,9 +207,11 @@ func (r *Repository) CreateMessage(ctx context.Context, conversation *Conversati
 	defer tx.Rollback()
 
 	result, err := tx.ExecContext(ctx, `
-		INSERT INTO chat_messages (conversation_id, sender_id, receiver_id, content, message_type, read_status)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`, conversation.ID, senderID, receiverID, content, MessageTypeText, ReadStatusUnread)
+		INSERT INTO chat_messages (
+			conversation_id, sender_id, receiver_id, content, message_type, actor_type, read_status
+		)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, conversation.ID, senderID, receiverID, content, MessageTypeText, ActorTypeUser, ReadStatusUnread)
 	if err != nil {
 		return nil, fmt.Errorf("create chat message: %w", err)
 	}
@@ -217,22 +245,98 @@ func (r *Repository) CreateMessage(ctx context.Context, conversation *Conversati
 	return r.GetMessageByID(ctx, messageID)
 }
 
+func (r *Repository) CreateOrderEvent(ctx context.Context, conversation *Conversation, input OrderEventInput) (*Message, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin order event tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	var receiverID *uint64
+	readStatus := ReadStatusUnread
+	if input.ActorType == ActorTypeUser && input.ActorID != nil {
+		receiver := conversation.SellerID
+		if *input.ActorID == conversation.SellerID {
+			receiver = conversation.BuyerID
+		}
+		receiverID = &receiver
+	} else {
+		readStatus = ReadStatusRead
+	}
+
+	result, err := tx.ExecContext(ctx, `
+		INSERT INTO chat_messages (
+			conversation_id, sender_id, receiver_id, content, message_type,
+			actor_type, order_id, event_type, read_status
+		)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, conversation.ID, input.ActorID, receiverID, input.Content, MessageTypeOrderEvent,
+		input.ActorType, input.OrderID, input.EventType, readStatus)
+	if err != nil {
+		return nil, fmt.Errorf("create order event: %w", err)
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("get created order event id: %w", err)
+	}
+	messageID := uint64(id)
+
+	if input.ActorType == ActorTypeSystem {
+		_, err = tx.ExecContext(ctx, `
+			UPDATE chat_conversations
+			SET last_message_id = ?, last_message_content = ?, last_message_time = NOW(),
+				buyer_unread_count = buyer_unread_count + 1,
+				seller_unread_count = seller_unread_count + 1,
+				buyer_hidden_at = NULL, seller_hidden_at = NULL,
+				update_time = CURRENT_TIMESTAMP
+			WHERE id = ?
+		`, messageID, input.Content, conversation.ID)
+	} else {
+		unreadColumn := "seller_unread_count"
+		hiddenColumn := "seller_hidden_at"
+		if receiverID != nil && *receiverID == conversation.BuyerID {
+			unreadColumn = "buyer_unread_count"
+			hiddenColumn = "buyer_hidden_at"
+		}
+		updateQuery := fmt.Sprintf(`
+			UPDATE chat_conversations
+			SET last_message_id = ?, last_message_content = ?, last_message_time = NOW(),
+				%s = %s + 1, %s = NULL, update_time = CURRENT_TIMESTAMP
+			WHERE id = ?
+		`, unreadColumn, unreadColumn, hiddenColumn)
+		_, err = tx.ExecContext(ctx, updateQuery, messageID, input.Content, conversation.ID)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("update conversation after order event: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit order event tx: %w", err)
+	}
+	return r.GetMessageByID(ctx, messageID)
+}
+
 func (r *Repository) GetMessageByID(ctx context.Context, messageID uint64) (*Message, error) {
 	var item Message
-	if err := r.db.QueryRowContext(ctx, `
+	query := `
 		SELECT id, conversation_id, sender_id, receiver_id, content, message_type,
-			read_status, DATE_FORMAT(create_time, '%Y-%m-%d %H:%i:%s')
+			actor_type, order_id, event_type, read_status,
+			DATE_FORMAT(create_time, '%Y-%m-%d %H:%i:%s')
 		FROM chat_messages
 		WHERE id = ?
-	`, messageID).Scan(
-		&item.ID, &item.ConversationID, &item.SenderID, &item.ReceiverID,
-		&item.Content, &item.MessageType, &item.ReadStatus, &item.CreateTime,
+	`
+	var senderID, receiverID, orderID sql.NullInt64
+	var eventType sql.NullString
+	if err := r.db.QueryRowContext(ctx, query, messageID).Scan(
+		&item.ID, &item.ConversationID, &senderID, &receiverID,
+		&item.Content, &item.MessageType, &item.ActorType, &orderID, &eventType,
+		&item.ReadStatus, &item.CreateTime,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("get chat message: %w", err)
 	}
+	fillMessageNullableFields(&item, senderID, receiverID, orderID, eventType)
 	return &item, nil
 }
 
@@ -399,5 +503,23 @@ func fillConversationNullableFields(item *Conversation, lastMessageID sql.NullIn
 	}
 	if lastMessageTime.Valid {
 		item.LastMessageTime = &lastMessageTime.String
+	}
+}
+
+func fillMessageNullableFields(item *Message, senderID, receiverID, orderID sql.NullInt64, eventType sql.NullString) {
+	if senderID.Valid {
+		value := uint64(senderID.Int64)
+		item.SenderID = &value
+	}
+	if receiverID.Valid {
+		value := uint64(receiverID.Int64)
+		item.ReceiverID = &value
+	}
+	if orderID.Valid {
+		value := uint64(orderID.Int64)
+		item.OrderID = &value
+	}
+	if eventType.Valid {
+		item.EventType = &eventType.String
 	}
 }
