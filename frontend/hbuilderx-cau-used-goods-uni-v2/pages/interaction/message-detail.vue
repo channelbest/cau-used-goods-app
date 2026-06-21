@@ -1,11 +1,14 @@
 <template>
   <view v-if="message" class="page">
-    <view class="hero" :class="{ 'auth-hero': isStudentAuthResult || isAccountStatusChange, 'notice-hero': isPlainNotice }">
+    <view class="hero" :class="{ 'auth-hero': isStudentAuthResult || isAccountStatusChange || isAdminProductOffShelf, 'notice-hero': isPlainNotice }">
       <template v-if="isStudentAuthResult">
         <text class="auth-title">{{ studentAuthPassed ? '学生认证通过' : '学生认证未通过' }}</text>
       </template>
       <template v-else-if="isAccountStatusChange">
         <text class="auth-title">{{ accountStatusTitle }}</text>
+      </template>
+      <template v-else-if="isAdminProductOffShelf">
+        <text class="auth-title">商品已下架</text>
       </template>
       <template v-else-if="isPlainNotice">
         <text class="hero-title">{{ noticeTitle }}</text>
@@ -22,7 +25,7 @@
       <button v-else class="btn primary" @click="goAppeal">去申诉</button>
     </view>
 
-    <view v-else-if="isAccountStatusChange" class="account-status-content">
+    <view v-else-if="isAccountStatusChange && accountStatusAbnormal" class="account-status-content">
       <view class="status-reason">
         <text class="reason-label">原因</text>
         <text class="reason-value">{{ accountStatusReason }}</text>
@@ -33,6 +36,29 @@
       </view>
       <view class="auth-actions">
         <button class="btn primary" @click="goAppeal">去申诉</button>
+      </view>
+    </view>
+
+    <view v-else-if="isAdminProductOffShelf" class="account-status-content">
+      <view v-if="productOffShelfReason" class="status-reason">
+        <text class="reason-label">原因</text>
+        <text class="reason-value">{{ productOffShelfReason }}</text>
+      </view>
+      <view v-if="relatedCard" class="card related-card" @click="openRelated">
+        <image v-if="relatedCard.image" class="cover" :src="relatedCard.image" mode="aspectFill" />
+        <view v-else class="cover placeholder">{{ relatedCard.placeholder }}</view>
+        <view class="related-body">
+          <view class="related-head">
+            <text class="related-label">{{ relatedCard.label }}</text>
+            <text :class="['mini-status', relatedCard.statusClass]">{{ relatedCard.status }}</text>
+          </view>
+          <text class="related-title">{{ relatedCard.title }}</text>
+          <text class="related-meta">{{ relatedCard.meta }}</text>
+        </view>
+        <text class="arrow">›</text>
+      </view>
+      <view class="auth-actions">
+        <button class="btn primary" @click="goProductAppeal">去申诉</button>
       </view>
     </view>
 
@@ -90,22 +116,52 @@ const isStudentAuthResult = computed(() => (
   || String(message.value?.content || '').includes('学生认证未通过')
 ))
 const studentAuthPassed = computed(() => isStudentAuthResult.value && !String(message.value?.content || '').includes('未通过'))
+const isNormalAccountStatus = computed(() => {
+  const content = String(message.value?.content || '')
+  const status = String(
+    message.value?.accountStatus
+    || message.value?.user?.accountStatus
+    || message.value?.relatedUser?.accountStatus
+    || ''
+  ).toUpperCase()
+
+  return status === 'NORMAL' || content.includes('恢复正常') || content.includes('账号正常')
+})
 const isAccountStatusChange = computed(() => (
   message.value?.title === '账号状态变更'
+  || String(message.value?.content || '').includes('账号状态已恢复正常')
   || String(message.value?.content || '').includes('账号已被')
   || String(message.value?.content || '').includes('已被临时禁用')
   || String(message.value?.content || '').includes('已被永久封禁')
 ))
+const accountStatusAbnormal = computed(() => {
+  const status = String(
+    message.value?.accountStatus
+    || message.value?.user?.accountStatus
+    || message.value?.relatedUser?.accountStatus
+    || ''
+  ).toUpperCase()
+
+  if (status) return status !== 'NORMAL'
+  return !isNormalAccountStatus.value
+})
 const accountStatusTitle = computed(() => {
-  const content = String(message.value?.content || '')
-  if (content.includes('永久封禁')) return '账号已被永久封禁'
-  if (content.includes('临时禁用') || content.includes('已被禁用')) return '账号已被临时禁用'
-  return '账号状态已变更'
+  return accountStatusAbnormal.value ? '账号已封禁' : '账号正常'
 })
 const accountStatusReason = computed(() => {
   const content = String(message.value?.content || '')
+  const match = content.match(/原因[：:]\s*([^；;]+)/)
+  return match ? match[1].trim() : content
+})
+const isAdminProductOffShelf = computed(() => {
+  const title = String(message.value?.title || '')
+  const content = String(message.value?.content || '')
+  return title === '商品下架通知' && content.includes('管理员下架')
+})
+const productOffShelfReason = computed(() => {
+  const content = String(message.value?.content || '')
   const match = content.match(/原因[：:]\s*(.+)/)
-  return match ? match[1] : content
+  return match ? match[1].trim() : ''
 })
 const hasRelatedTransactions = computed(() => {
   const content = String(message.value?.content || '')
@@ -138,7 +194,10 @@ const detailContent = computed(() => {
   return message.value?.content || '暂无正文内容'
 })
 
-const relatedCard = computed(() => buildRelatedCard(message.value || {}))
+const relatedCard = computed(() => {
+  if (isNormalAccountStatus.value) return null
+  return buildRelatedCard(message.value || {})
+})
 
 onLoad(async (options) => {
   try {
@@ -300,6 +359,14 @@ function goHome() {
 
 function goAppeal() {
   navigate('/pages/interaction/appeal', { targetType: 'USER' })
+}
+
+function goProductAppeal() {
+  const targetId = message.value?.targetId
+    || message.value?.relatedId
+    || message.value?.product?.id
+    || message.value?.relatedProduct?.id
+  navigate('/pages/interaction/appeal', { targetType: 'PRODUCT', targetId })
 }
 </script>
 
