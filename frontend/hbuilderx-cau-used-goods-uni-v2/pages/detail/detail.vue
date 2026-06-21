@@ -459,6 +459,7 @@ onLoad(async (options) => {
     failedImages.value = []
     await loadSellerProfile()
     await loadFavoriteState(id)
+    await loadChatEligibility(id)
   } catch (error) {
     if (!readonlyMode.value && await loadOwnProductFallback(id, options)) return
 

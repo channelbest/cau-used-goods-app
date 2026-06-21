@@ -23,7 +23,34 @@
     <scroll-view scroll-y class="messages" :class="{ 'has-product': productId, 'has-restriction': isCurrentUserRestricted }" :scroll-into-view="lastMessageId">
       <view v-for="item in displayMessages" :id="`msg-${item.id}`" :key="item.id">
         <view v-if="item.showTime" class="time-divider">{{ item.timeText }}</view>
-        <view class="message-swipe" :class="{ active: swipedMessageId === item.id }">
+        <view v-if="item.isSystemEvent" class="system-event" @click="openOrderEvent(item)">
+          <text class="system-event-content">{{ item.content }}</text>
+          <text class="event-order-link">查看订单 ›</text>
+        </view>
+        <view v-else-if="item.isOrderEvent" class="order-event-row" :class="{ mine: item.mine }" @click="openOrderEvent(item)">
+          <image
+            v-if="!item.mine && messageAvatar(item)"
+            class="avatar image-avatar event-avatar"
+            :src="messageAvatar(item)"
+            mode="aspectFill"
+            @click.stop="openUser(item.senderId)"
+          />
+          <view v-else-if="!item.mine" class="avatar event-avatar event-avatar-fallback">{{ item.actorName.slice(0, 1) }}</view>
+          <view class="order-event-card">
+            <text class="event-actor">{{ item.actorLabel }}</text>
+            <text class="event-content">{{ item.content }}</text>
+            <text class="event-order-link">查看订单 ›</text>
+          </view>
+          <image
+            v-if="item.mine && messageAvatar(item)"
+            class="avatar image-avatar event-avatar"
+            :src="messageAvatar(item)"
+            mode="aspectFill"
+            @click.stop="openUser(currentUserId)"
+          />
+          <view v-else-if="item.mine" class="avatar event-avatar event-avatar-fallback">{{ item.actorName.slice(0, 1) }}</view>
+        </view>
+        <view v-else class="message-swipe" :class="{ active: swipedMessageId === item.id }">
           <view class="message-delete" @click.stop="removeMessage(item)">删除</view>
           <view
             class="message-front"
@@ -227,9 +254,17 @@ const displayMessages = computed(() => {
     const currentTime = messageTime(item)
     const showTime = index === 0 || !previousTime || currentTime - previousTime > 5 * 60 * 1000
     if (currentTime) previousTime = currentTime
+    const isOrderEvent = String(item.messageType || '').toUpperCase() === 'ORDER_EVENT'
+    const isSystemEvent = isOrderEvent && String(item.actorType || '').toUpperCase() === 'SYSTEM'
+    const mine = Boolean(item.senderId) && Number(item.senderId) === Number(currentUserId.value)
+    const actorName = mine ? mineName.value : (sellerName.value || '对方')
     return {
       ...item,
-      mine: Number(item.senderId) === Number(currentUserId.value),
+      mine,
+      isOrderEvent,
+      isSystemEvent,
+      actorName,
+      actorLabel: mine ? '你进行了订单操作' : `${actorName}进行了订单操作`,
       showTime,
       timeText: formatTime(item.createTime)
     }
@@ -244,7 +279,7 @@ const load = async () => {
     const result = await listMessages(conversationId.value, { page: 1, pageSize: 50 })
     messages.value = visibleMessageItems(result.items || [])
     if (!targetUserId.value) {
-      const otherMessage = messages.value.find((item) => Number(item.senderId) !== Number(currentUserId.value))
+      const otherMessage = messages.value.find((item) => item.senderId && Number(item.senderId) !== Number(currentUserId.value))
       targetUserId.value = otherMessage?.senderId || ''
     }
     await markConversationRead(conversationId.value)
@@ -415,6 +450,15 @@ async function openProduct() {
   }
 }
 
+function openOrderEvent(item) {
+  const orderId = item?.orderId || item?.order_id
+  if (!orderId) {
+    uni.showToast({ title: '订单信息暂不可查看', icon: 'none' })
+    return
+  }
+  navigate('/pages/order/detail', { id: orderId })
+}
+
 onLoad(async (options) => {
   conversationId.value = options.conversationId || ''
   title.value = options.title ? decodeURIComponent(options.title) : ''
@@ -458,6 +502,17 @@ onPullDownRefresh(async () => {
 .restriction-banner { padding: 14rpx 28rpx; background: #fef3f2; border-bottom: 1rpx solid #fee4e2; text-align: center; }
 .restriction-text { color: #d92d20; font-size: 26rpx; font-weight: 500; }
 .time-divider { width: fit-content; max-width: 420rpx; margin: 18rpx auto; padding: 6rpx 16rpx; border-radius: 999rpx; background: #dfe7e3; color: #7b8782; font-size: 21rpx; text-align: center; }
+.system-event { display: flex; width: fit-content; max-width: 600rpx; margin: 0 auto 20rpx; padding: 14rpx 20rpx; flex-direction: column; align-items: center; gap: 8rpx; border-radius: 16rpx; background: #e3e9e6; color: #69756f; text-align: center; box-sizing: border-box; }
+.system-event-content { font-size: 23rpx; line-height: 1.55; }
+.order-event-row { display: flex; margin-bottom: 20rpx; align-items: flex-end; justify-content: flex-start; gap: 12rpx; }
+.order-event-row.mine { justify-content: flex-end; }
+.event-avatar { width: 58rpx; height: 58rpx; }
+.event-avatar-fallback { background: #6b8b7e; }
+.order-event-card { display: flex; width: 480rpx; max-width: 82%; padding: 18rpx 20rpx; flex-direction: column; gap: 8rpx; border: 1rpx solid #dce8e1; border-radius: 18rpx; background: #fff; box-sizing: border-box; }
+.order-event-row.mine .order-event-card { border-color: #bcdacb; background: #e7f4ec; }
+.event-actor { color: #7d8983; font-size: 21rpx; }
+.event-content { color: #26342f; font-size: 27rpx; font-weight: 650; line-height: 1.5; }
+.event-order-link { color: #23734f; font-size: 22rpx; font-weight: 600; }
 .message-swipe { position: relative; overflow: hidden; margin: 0 -28rpx 18rpx; padding: 0 28rpx; }
 .message-delete { position: absolute; top: 6rpx; right: 28rpx; bottom: 6rpx; display: flex; width: 120rpx; align-items: center; justify-content: center; border-radius: 16rpx; background: #f04444; color: #fff; font-size: 26rpx; opacity: 0; transition: opacity .12s ease; }
 .message-swipe.active .message-delete { opacity: 1; }
