@@ -98,7 +98,8 @@ const avatarUrl = computed(() => normalizeImage(profile.value?.avatarUrl))
 const accountStatus = computed(() => adminUser.value?.accountStatus || (profile.value?.tradeAvailable ? 'NORMAL' : 'DISABLED'))
 const currentUserRole = computed(() => String(getUser()?.role || '').toUpperCase())
 const isSuperAdmin = computed(() => currentUserRole.value === 'SUPER_ADMIN')
-const canRecoverUser = computed(() => accountStatus.value === 'DISABLED' || (accountStatus.value === 'BANNED' && isSuperAdmin.value))
+const hasAppealContext = computed(() => relatedType.value === 'APPEAL' && Number(relatedId.value) > 0)
+const canRecoverUser = computed(() => accountStatus.value === 'DISABLED' || (accountStatus.value === 'BANNED' && isSuperAdmin.value && hasAppealContext.value))
 const recoverButtonText = computed(() => accountStatus.value === 'BANNED' ? '解封' : '恢复')
 
 function normalizeImage(url) {

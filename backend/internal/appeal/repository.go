@@ -290,13 +290,14 @@ func (r *Repository) Handle(ctx context.Context, input HandleAppealInput) (*Appe
 }
 
 func (r *Repository) HandleTx(ctx context.Context, tx *sql.Tx, input HandleAppealInput) error {
-	var currentStatus string
+	var currentStatus, targetType string
+	var targetID uint64
 	if err := tx.QueryRowContext(ctx, `
-		SELECT status
+		SELECT status, target_type, target_id
 		FROM appeals
 		WHERE id = ?
 		FOR UPDATE
-	`, input.AppealID).Scan(&currentStatus); err != nil {
+	`, input.AppealID).Scan(&currentStatus, &targetType, &targetID); err != nil {
 		if err == sql.ErrNoRows {
 			return fmt.Errorf("appeal not found")
 		}
@@ -305,6 +306,14 @@ func (r *Repository) HandleTx(ctx context.Context, tx *sql.Tx, input HandleAppea
 	if currentStatus != StatusPending && currentStatus != StatusProcessing {
 		return fmt.Errorf("appeal already handled")
 	}
+	if currentStatus != StatusProcessing {
+		return fmt.Errorf("appeal must be marked processing before handle")
+	}
+	if input.Status == StatusApproved {
+		if err := r.validateApprovedActionTx(ctx, tx, targetType, targetID); err != nil {
+			return err
+		}
+	}
 
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE appeals
@@ -312,6 +321,28 @@ func (r *Repository) HandleTx(ctx context.Context, tx *sql.Tx, input HandleAppea
 		WHERE id = ?
 	`, input.Status, input.HandleResult, input.AdminID, input.AppealID); err != nil {
 		return fmt.Errorf("handle appeal: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) validateApprovedActionTx(ctx context.Context, tx *sql.Tx, targetType string, targetID uint64) error {
+	if targetType != TargetTypeUser {
+		return nil
+	}
+	var accountStatus string
+	if err := tx.QueryRowContext(ctx, `
+		SELECT account_status
+		FROM users
+		WHERE id = ? AND is_deleted = 0
+		FOR UPDATE
+	`, targetID).Scan(&accountStatus); err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("appeal target not found")
+		}
+		return fmt.Errorf("check appealed user status: %w", err)
+	}
+	if accountStatus != "NORMAL" {
+		return fmt.Errorf("user appeal target must be restored before approval")
 	}
 	return nil
 }

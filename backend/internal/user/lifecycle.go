@@ -328,7 +328,7 @@ func validateRelatedRecordTx(ctx context.Context, tx *sql.Tx, relatedType string
 		args = []interface{}{relatedID, userID}
 	case "APPEAL":
 		query = `SELECT COUNT(*) FROM appeals
-			WHERE id = ? AND appellant_id = ? AND target_type = 'USER' AND target_id = ? AND status = 'APPROVED'`
+			WHERE id = ? AND appellant_id = ? AND target_type = 'USER' AND target_id = ? AND status IN ('PROCESSING', 'APPROVED')`
 		args = []interface{}{relatedID, userID, userID}
 	default:
 		return fmt.Errorf("relatedType 只能是 REPORT 或 APPEAL")
