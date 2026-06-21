@@ -16,7 +16,7 @@
         <template v-if="adminView">
           <button v-if="accountStatus === 'NORMAL'" class="disable-btn" @click="changeUserStatus('DISABLED')">禁用</button>
           <button v-if="accountStatus === 'NORMAL' || accountStatus === 'DISABLED'" class="ban-btn" @click="changeUserStatus('BANNED')">封禁</button>
-          <button v-if="canRecoverUser" class="recover-btn" @click="changeUserStatus('NORMAL')">恢复</button>
+          <button v-if="canRecoverUser" class="recover-btn" @click="changeUserStatus('NORMAL')">{{ recoverButtonText }}</button>
         </template>
         <template v-else>
           <button v-if="!isSelf" class="chat-btn" :disabled="isCurrentUserRestricted" @click="chatWithUser">聊一聊</button>
@@ -99,6 +99,7 @@ const accountStatus = computed(() => adminUser.value?.accountStatus || (profile.
 const currentUserRole = computed(() => String(getUser()?.role || '').toUpperCase())
 const isSuperAdmin = computed(() => currentUserRole.value === 'SUPER_ADMIN')
 const canRecoverUser = computed(() => accountStatus.value === 'DISABLED' || (accountStatus.value === 'BANNED' && isSuperAdmin.value))
+const recoverButtonText = computed(() => accountStatus.value === 'BANNED' ? '解封' : '恢复')
 
 function normalizeImage(url) {
   if (!url) return ''

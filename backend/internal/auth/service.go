@@ -47,8 +47,8 @@ func (s *Service) DevLogin(ctx context.Context, input DevLoginInput) (*LoginResu
 	if len(input.OpenID) > 64 {
 		return nil, fmt.Errorf("openid 长度不能超过 64 个字符")
 	}
-	if input.Role != "" && input.Role != "USER" && input.Role != "ADMIN" {
-		return nil, fmt.Errorf("role 只能是 USER 或 ADMIN")
+	if input.Role != "" && input.Role != "USER" && input.Role != "ADMIN" && input.Role != "SUPER_ADMIN" {
+		return nil, fmt.Errorf("角色只能是普通用户、管理员或超级管理员")
 	}
 
 	result, err := s.loginByOpenID(ctx, input.OpenID)
