@@ -60,6 +60,7 @@ import { tradeService } from '../../services/trade'
 import { getUser } from '../../utils/auth'
 import { BASE_URL } from '../../utils/request'
 import { navigate, showError } from '../../utils/navigation'
+import { updateMessageTabBadge } from '../../utils/tabbar'
 import { accountStatusOf, isBannedUserStatus } from '../../utils/user-format'
 
 const SYSTEM_TYPES = ['ORDER_CREATED', 'ORDER_CONFIRMED', 'ORDER_CANCELED', 'ORDER_TIMEOUT', 'REPORT_HANDLED', 'SYSTEM_NOTICE']
@@ -358,12 +359,7 @@ async function load() {
 }
 
 function updateTabBadge() {
-  const text = unreadTotal.value > 99 ? '99+' : String(unreadTotal.value)
-  if (unreadTotal.value > 0) {
-    uni.setTabBarBadge({ index: 2, text })
-  } else {
-    uni.removeTabBarBadge({ index: 2 })
-  }
+  updateMessageTabBadge(unreadTotal.value)
 }
 
 function openSystemMessages() {

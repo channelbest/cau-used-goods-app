@@ -43,6 +43,7 @@ import { onShow } from '@dcloudio/uni-app'
 import EmptyState from '../../components/EmptyState.vue'
 import { tradeService } from '../../services/trade'
 import { navigate, showError } from '../../utils/navigation'
+import { updateMessageTabBadge } from '../../utils/tabbar'
 
 const ORDER_MESSAGE_TYPES = ['ORDER_CREATED', 'ORDER_CONFIRMED', 'ORDER_CANCELED', 'ORDER_TIMEOUT', 'ORDER_EXCEPTION_CLOSED']
 const SYSTEM_TYPES = [...ORDER_MESSAGE_TYPES, 'REPORT_HANDLED', 'SYSTEM_NOTICE']
@@ -68,9 +69,7 @@ async function load() {
 }
 
 function updateBadge() {
-  const total = unreadCount.value
-  if (total > 0) uni.setTabBarBadge({ index: 2, text: total > 99 ? '99+' : String(total) })
-  else uni.removeTabBarBadge({ index: 2 })
+  updateMessageTabBadge(unreadCount.value)
 }
 
 async function open(item) {

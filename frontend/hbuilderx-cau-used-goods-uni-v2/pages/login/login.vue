@@ -1,9 +1,12 @@
 <template>
   <view class="page">
     <view class="title">CAU 二手交易平台</view>
-    <view class="subtitle">开发调试登录</view>
+    <view class="subtitle">登录后继续使用校园二手交易服务</view>
 
     <view class="card">
+      <button class="login-button" :loading="loading" @click="handleWechatLogin">微信登录</button>
+
+      <view class="dev-divider">开发调试登录</view>
       <text class="label">测试 OpenID</text>
       <input v-model="openid" class="input" placeholder="请输入 openid，或选择测试账号" />
 
@@ -19,14 +22,14 @@
         </view>
       </view>
 
-      <button class="login-button" :loading="loading" @click="handleDevLogin">登录</button>
+      <button class="login-button secondary" :loading="loading" @click="handleDevLogin">使用测试账号登录</button>
     </view>
   </view>
 </template>
 
 <script setup>
 import { ref } from 'vue'
-import { devLogin } from '../../api/auth'
+import { devLogin, reactivateAccount, wechatLogin } from '../../api/auth'
 import { saveLoginResult } from '../../utils/auth'
 
 const loading = ref(false)
@@ -61,6 +64,80 @@ function goAdmin() {
   uni.reLaunch({ url: '/pages/admin/admin' })
 }
 
+function loginWithWechatCode() {
+  return new Promise((resolve, reject) => {
+    uni.login({
+      provider: 'weixin',
+      success: ({ code }) => {
+        if (!code) {
+          reject(new Error('微信登录凭证为空'))
+          return
+        }
+        resolve(code)
+      },
+      fail: () => reject(new Error('微信登录失败，请稍后重试'))
+    })
+  })
+}
+
+function confirmModal(options) {
+  return new Promise((resolve) => {
+    uni.showModal({
+      ...options,
+      success: (res) => resolve(Boolean(res.confirm))
+    })
+  })
+}
+
+function routeAfterLogin(result) {
+  if (isAdminLogin('', result?.user)) {
+    goAdmin()
+    return
+  }
+  goHome()
+}
+
+async function handleReactivation(result) {
+  const confirmed = await confirmModal({
+    title: '恢复账号',
+    content: '该账号此前已注销。是否恢复原账号并继续登录？',
+    confirmText: '恢复',
+    cancelText: '取消'
+  })
+  if (!confirmed) {
+    uni.showToast({ title: '已取消恢复账号', icon: 'none' })
+    return
+  }
+  const restored = await reactivateAccount(result.reactivationToken)
+  saveLoginResult(restored)
+  uni.showToast({ title: '账号已恢复', icon: 'success' })
+  routeAfterLogin(restored)
+}
+
+async function finishLogin(result) {
+  if (result?.requiresReactivation && result?.reactivationToken) {
+    await handleReactivation(result)
+    return
+  }
+  saveLoginResult(result)
+  uni.showToast({ title: '登录成功', icon: 'success' })
+  routeAfterLogin(result)
+}
+
+async function handleWechatLogin() {
+  if (loading.value) return
+  loading.value = true
+  try {
+    const code = await loginWithWechatCode()
+    const result = await wechatLogin(code)
+    await finishLogin(result)
+  } catch (error) {
+    uni.showToast({ title: error.message || '登录失败', icon: 'none' })
+  } finally {
+    loading.value = false
+  }
+}
+
 async function handleDevLogin() {
   const value = openid.value.trim()
   if (!value) {
@@ -77,13 +154,7 @@ async function handleDevLogin() {
     if (isAdminLogin(value, result?.user)) {
       result.user = { ...(result.user || {}), role: account?.role || result?.user?.role || 'ADMIN' }
     }
-    saveLoginResult(result)
-    uni.showToast({ title: '登录成功', icon: 'success' })
-    if (isAdminLogin(value, result?.user)) {
-      goAdmin()
-      return
-    }
-    goHome()
+    await finishLogin(result)
   } catch (error) {
     uni.showToast({ title: error.message || '登录失败', icon: 'none' })
   } finally {
@@ -129,6 +200,23 @@ async function handleDevLogin() {
   color: #344054;
   font-size: 26rpx;
   font-weight: 700;
+}
+
+.dev-divider {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  margin: 36rpx 0 24rpx;
+  color: #98a2b3;
+  font-size: 24rpx;
+}
+
+.dev-divider::before,
+.dev-divider::after {
+  content: '';
+  flex: 1;
+  height: 1rpx;
+  background: #eef0f3;
 }
 
 .input {
@@ -180,5 +268,11 @@ async function handleDevLogin() {
   color: #fff;
   font-size: 30rpx;
   font-weight: 700;
+}
+
+.login-button.secondary {
+  margin-top: 34rpx;
+  background: #eef7f0;
+  color: #17a84b;
 }
 </style>
