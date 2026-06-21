@@ -292,6 +292,7 @@ function openSeller() {
   const productId = order.value?.product?.id || order.value?.productId
   navigate('/pages/user-profile/user-profile', {
     id: sellerId.value,
+    adminView: adminView.value ? 1 : '',
     productId,
     productTitle: order.value?.product?.title || order.value?.productTitleSnapshot || ''
   })

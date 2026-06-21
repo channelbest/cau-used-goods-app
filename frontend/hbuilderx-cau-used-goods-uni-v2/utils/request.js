@@ -6,6 +6,8 @@ export const normalizeErrorMessage = (message, fallback = '请求失败，请稍
   const value = String(message || '').trim()
   if (!value) return fallback
   const lower = value.toLowerCase()
+  if (lower.includes('already have an active order')) return '你已预约过该商品，不能重复提交预约'
+  if (lower.includes('cannot buy your own product')) return '不能预约自己发布的商品'
   if (lower.includes('not found')) return '未找到相关数据'
   if (lower.includes('already reviewed')) return '该订单已经评价过'
   if (lower.includes('unauthorized') || lower.includes('token')) return '登录已过期，请重新登录'

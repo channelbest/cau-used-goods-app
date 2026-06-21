@@ -314,6 +314,7 @@ function openSeller() {
   if (!sellerId.value) return
   navigate('/pages/user-profile/user-profile', {
     id: sellerId.value,
+    adminView: adminView.value ? 1 : '',
     productId: product.value?.id,
     productTitle: product.value?.title
   })

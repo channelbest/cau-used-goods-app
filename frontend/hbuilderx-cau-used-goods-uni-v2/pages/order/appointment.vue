@@ -36,8 +36,8 @@
         <textarea v-model="form.remark" class="textarea" placeholder="可填写时间补充或其他说明" maxlength="200" />
       </view>
 
-      <button class="btn btn-primary submit-btn" :disabled="submitting" @click="submit">
-        {{ submitting ? '正在提交...' : '确认提交预约' }}
+      <button class="btn btn-primary submit-btn" :class="{ duplicate: hasActiveOrder }" :disabled="submitting" @click="submit">
+        {{ hasActiveOrder ? '已预约，不能重复提交' : (submitting ? '正在提交...' : '确认提交预约') }}
       </button>
     </view>
   </view>
@@ -51,6 +51,7 @@ import { showError, showSuccess } from '../../utils/navigation'
 
 const product = ref()
 const submitting = ref(false)
+const hasActiveOrder = ref(false)
 const productId = ref('')
 const form = reactive({ meetDate: '', meetClock: '', meetLocation: '', remark: '' })
 const minDate = computed(() => formatDate(new Date()))
@@ -58,13 +59,36 @@ const minDate = computed(() => formatDate(new Date()))
 onLoad(async (options) => {
   productId.value = options.productId || 'p-1001'
   initDefaultTime()
+  await checkActiveOrder()
   try {
     product.value = await tradeService.getProduct(productId.value)
     form.meetLocation = product.value.meetLocation
   } catch (error) {
-    showError(error)
+    if (!hasActiveOrder.value) showError(error)
   }
 })
+
+async function checkActiveOrder() {
+  try {
+    const orders = await tradeService.getOrders('buyer', { pageSize: 100 })
+    hasActiveOrder.value = (orders || []).some((order) => (
+      String(order.productId || order.product?.id) === String(productId.value)
+      && ['PENDING_CONFIRM', 'WAIT_MEET'].includes(order.status)
+    ))
+  } catch (error) {
+    hasActiveOrder.value = false
+  }
+  return hasActiveOrder.value
+}
+
+function showDuplicateAppointment() {
+  uni.showModal({
+    title: '不能重复预约',
+    content: '你已经预约过该商品，请前往“我的订单”查看当前预约进度。',
+    showCancel: false,
+    confirmText: '我知道了'
+  })
+}
 
 function pad(value) {
   return String(value).padStart(2, '0')
@@ -105,6 +129,10 @@ function normalizedMeetTime() {
 }
 
 async function submit() {
+  if (hasActiveOrder.value || await checkActiveOrder()) {
+    showDuplicateAppointment()
+    return
+  }
   if (!form.meetDate || !form.meetClock || !form.meetLocation) {
     showError(new Error('请选择面交时间并填写地点'))
     return
@@ -125,7 +153,12 @@ async function submit() {
     showSuccess('预约成功')
     setTimeout(() => uni.redirectTo({ url: `/pages/order/detail?id=${order.id}` }), 500)
   } catch (error) {
-    showError(error)
+    const message = String(error?.message || '')
+    if (message.includes('已预约过该商品')) {
+      showDuplicateAppointment()
+    } else {
+      showError(error)
+    }
   } finally {
     submitting.value = false
   }
@@ -148,4 +181,5 @@ async function submit() {
 .appointment-input { min-height: 82rpx; line-height: 82rpx; }
 .field-tip { display: block; margin-top: 10rpx; color: #8a9690; font-size: 22rpx; line-height: 1.5; }
 .submit-btn { margin-top: 8rpx; min-height: 84rpx; font-size: 30rpx; }
+.submit-btn.duplicate { background: #8a9690; }
 </style>
