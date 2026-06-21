@@ -62,9 +62,9 @@
       <view v-if="item.handleResult" class="handle-result">{{ item.handleResult }}</view>
 
       <view v-if="canHandle(item.status)" class="actions">
-        <button v-if="item.status === 'PENDING'" size="mini" class="process" @click="handleCurrent('PROCESSING')">开始处理</button>
-        <button v-if="item.status === 'PROCESSING'" size="mini" class="pass" @click="handleCurrent('APPROVED')">{{ mode === 'REPORT' ? '处理完成' : '通过申诉' }}</button>
-        <button v-if="item.status === 'PROCESSING'" size="mini" class="reject" @click="openReasonModal">{{ mode === 'REPORT' ? '驳回' : '驳回申诉' }}</button>
+        <button v-if="isPending(item.status)" size="mini" class="process" :disabled="submitting" @click="handleCurrent('PROCESSING')">开始处理</button>
+        <button v-if="isProcessing(item.status)" size="mini" class="pass" :disabled="submitting" @click="handleCurrent('APPROVED')">{{ mode === 'REPORT' ? '处理完成' : '通过申诉' }}</button>
+        <button v-if="isProcessing(item.status)" size="mini" class="reject" :disabled="submitting" @click="openReasonModal">{{ mode === 'REPORT' ? '驳回' : '驳回申诉' }}</button>
       </view>
     </view>
 
@@ -97,7 +97,8 @@ import {
   handleAdminReport,
   markAdminAppealProcessing,
   markAdminReportProcessing,
-  getAdminProductById
+  getAdminProductById,
+  getAdminUserDetail
 } from '../../api/admin'
 import { getPublicProfile } from '../../api/user'
 import { normalizeImage } from '../../utils/product-format'
@@ -133,7 +134,7 @@ const targetUserAvatar = computed(() => item.value?.targetType === 'USER' ? norm
 const targetUserName = computed(() => targetUser.value?.nickname || targetUser.value?.realName || targetUser.value?.real_name || '')
 const targetEntryImage = computed(() => {
   if (item.value?.targetType === 'USER') return targetUserAvatar.value
-  if (item.value?.targetType === 'ORDER') return orderProductImage(targetOrder.value)
+  if (item.value?.targetType === 'ORDER') return orderProductImage(targetOrder.value || item.value)
   return ''
 })
 const targetEntryPlaceholder = computed(() => {
@@ -152,8 +153,9 @@ const targetEntryMeta = computed(() => {
     return targetUserName.value || '用户主页'
   }
   if (item.value?.targetType === 'ORDER') {
-    const buyerName = displayRelatedUserName(targetOrder.value || {}, 'buyer', '买家')
-    const productTitle = targetOrder.value?.productTitleSnapshot || targetOrder.value?.product?.title || '订单商品'
+    const source = targetOrder.value || item.value || {}
+    const buyerName = displayRelatedUserName(source, 'buyer', '买家')
+    const productTitle = source.productTitleSnapshot || source.productTitle || source.product?.title || source.targetTitle || '订单商品'
     return `${buyerName} · ${productTitle}`
   }
   return `${targetText(item.value?.targetType)} #${item.value?.targetId}`
@@ -192,7 +194,7 @@ const load = async () => {
       }
     }
     if (item.value?.targetType === 'USER' && item.value.targetId) {
-      targetUser.value = await getPublicProfile(item.value.targetId).catch(() => null)
+      targetUser.value = await loadTargetUser(item.value.targetId)
     }
     if (item.value?.targetType === 'ORDER' && item.value.targetId) {
       order.value = await findAdminOrder(item.value.targetId).catch(() => null)
@@ -242,7 +244,10 @@ const actorName = (record) => mode.value === 'REPORT'
   ? displayRelatedUserName(record, 'reporter', `用户${record.reporterId}`)
   : displayRelatedUserName(record, 'appellant', `用户${record.appellantId}`)
 const shortTime = (value) => value ? String(value).replace('T', ' ').slice(0, 16) : ''
-const canHandle = (status) => ['PENDING', 'PROCESSING'].includes(status)
+const isPending = (status) => normalizeStatus(status) === 'PENDING'
+const isProcessing = (status) => normalizeStatus(status) === 'PROCESSING'
+const isFinalStatus = (status) => ['APPROVED', 'RESOLVED', 'REJECTED', 'CLOSED'].includes(normalizeStatus(status))
+const canHandle = (status) => isPending(status) || isProcessing(status)
 const productCover = (record) => normalizeImage(
   record?.imageUrl
   || record?.image_url
@@ -255,6 +260,12 @@ const productCover = (record) => normalizeImage(
   || ''
 )
 const productStatusText = (status) => ({ ON_SALE: '在售', OFF_SHELF: '已下架', LOCKED: '交易锁定', SOLD: '已售出', DELETED: '已删除' }[status] || status || '未知')
+const loadTargetUser = async (userId) => {
+  const adminDetail = await getAdminUserDetail(userId).catch(() => null)
+  if (adminDetail?.user) return adminDetail.user
+  if (adminDetail?.id) return adminDetail
+  return getPublicProfile(userId).catch(() => null)
+}
 const findAdminOrder = async (orderId) => {
   const result = await getAdminOrders('ALL', { pageSize: 200 })
   const list = Array.isArray(result) ? result : (result?.items || result?.list || result?.records || [])
@@ -264,13 +275,27 @@ const orderProductImage = (record) => normalizeImage(
   record?.productImage
   || record?.productImageUrl
   || record?.productImageSnapshot
+  || record?.product_image
+  || record?.product_image_url
+  || record?.product_image_snapshot
   || record?.productCover
   || record?.productCoverImage
+  || record?.product_cover
+  || record?.product_cover_image
   || record?.coverImage
+  || record?.cover_image
   || record?.imageUrl
+  || record?.image_url
+  || record?.image
+  || record?.snapshotImage
+  || record?.snapshot_image
+  || record?.targetImage
+  || record?.target_image
   || record?.product?.image
   || record?.product?.imageUrl
+  || record?.product?.image_url
   || record?.product?.coverImage
+  || record?.product?.cover_image
   || record?.product?.images?.[0]
   || ''
 )
@@ -325,6 +350,17 @@ const buildHandleResult = (reason, note) => {
 }
 
 const handleCurrent = (status) => {
+  const currentStatus = normalizeStatus(item.value?.status)
+  if (status === 'PROCESSING' && currentStatus !== 'PENDING') {
+    uni.showToast({ title: isFinalStatus(currentStatus) ? '该记录已处理，不能重复操作' : '该记录当前不能开始处理', icon: 'none' })
+    load()
+    return
+  }
+  if (status !== 'PROCESSING' && currentStatus !== 'PROCESSING') {
+    uni.showToast({ title: isFinalStatus(currentStatus) ? '该记录已处理，不能重复操作' : '请先将该记录标记为处理中', icon: 'none' })
+    load()
+    return
+  }
   const action = statusText(status)
   uni.showModal({
     title: '确认处理',
@@ -344,6 +380,7 @@ const handleCurrent = (status) => {
         await load()
       } catch (error) {
         uni.showToast({ title: error.message || '处理失败', icon: 'none' })
+        await load()
       } finally {
         submitting.value = false
       }
