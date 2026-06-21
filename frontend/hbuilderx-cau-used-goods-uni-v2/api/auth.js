@@ -21,9 +21,29 @@ export const wechatLogin = (code) => {
   })
 }
 
+export const reactivateAccount = (reactivationToken) => {
+  return request({
+    url: '/auth/reactivate',
+    method: 'POST',
+    data: {
+      reactivationToken,
+      confirm: true
+    },
+    auth: false
+  })
+}
+
 export const getCurrentUser = () => {
   return request({
     url: '/users/me'
+  })
+}
+
+export const cancelAccount = () => {
+  return request({
+    url: '/users/cancel',
+    method: 'POST',
+    data: { confirm: true }
   })
 }
 

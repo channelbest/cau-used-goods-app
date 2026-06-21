@@ -95,17 +95,19 @@
     </view>
 
     <button class="logout-button" @click="logout">&#36864;&#20986;&#30331;&#24405;</button>
+    <button v-if="canCancelAccount" class="cancel-account-button" :loading="canceling" @click="cancelMyAccount">注销账号</button>
   </view>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { getCurrentUser } from '../../api/auth'
+import { cancelAccount, getCurrentUser } from '../../api/auth'
 import { clearAuth, getUser, setUser } from '../../utils/auth'
 import { BASE_URL } from '../../utils/request'
 
 const user = ref(getUser() || {})
+const canceling = ref(false)
 
 const authMap = {
   UNVERIFIED: '\u672a\u8ba4\u8bc1',
@@ -115,6 +117,8 @@ const authMap = {
 }
 
 const authStatus = computed(() => user.value?.authStatus || user.value?.auth_status || '')
+const accountStatus = computed(() => user.value?.accountStatus || user.value?.account_status || '')
+const role = computed(() => String(user.value?.role || '').toUpperCase())
 const authText = computed(() => authMap[authStatus.value] || '\u672a\u8ba4\u8bc1')
 const isVerified = computed(() => authStatus.value === 'VERIFIED')
 const authTone = computed(() => {
@@ -123,7 +127,8 @@ const authTone = computed(() => {
   if (authStatus.value === 'PENDING') return 'pending'
   return ''
 })
-const isAdmin = computed(() => user.value?.role === 'ADMIN')
+const isAdmin = computed(() => role.value === 'ADMIN' || role.value === 'SUPER_ADMIN')
+const canCancelAccount = computed(() => !isAdmin.value && accountStatus.value === 'NORMAL')
 const identityText = computed(() => isAdmin.value ? '\u7ba1\u7406\u5458' : `\u5b66\u751f\u8ba4\u8bc1\uff1a${authText.value}`)
 
 const avatarUrl = computed(() => {
@@ -163,6 +168,35 @@ const goFavorites = () => requireVerified(() => uni.navigateTo({ url: '/pages/in
 const goReportList = () => requireVerified(() => uni.navigateTo({ url: '/pages/interaction/report-list' }))
 const goAppealList = () => uni.navigateTo({ url: '/pages/interaction/appeal-list' })
 const goBrowseHistory = () => requireVerified(() => uni.navigateTo({ url: '/pages/interaction/browse-history' }))
+
+const confirmModal = (options) => new Promise((resolve) => {
+  uni.showModal({
+    ...options,
+    success: (res) => resolve(Boolean(res.confirm))
+  })
+})
+
+const cancelMyAccount = async () => {
+  if (canceling.value) return
+  const confirmed = await confirmModal({
+    title: '注销账号',
+    content: '注销后账号将退出平台，旧登录状态会失效。在重新登录并确认恢复前，无法继续使用交易功能。',
+    confirmText: '确认注销',
+    cancelText: '取消'
+  })
+  if (!confirmed) return
+  canceling.value = true
+  try {
+    await cancelAccount()
+    clearAuth()
+    uni.showToast({ title: '账号已注销', icon: 'success' })
+    setTimeout(() => uni.reLaunch({ url: '/pages/login/login' }), 500)
+  } catch (error) {
+    uni.showToast({ title: error.message || '注销失败', icon: 'none' })
+  } finally {
+    canceling.value = false
+  }
+}
 
 const logout = () => {
   clearAuth()
@@ -394,6 +428,17 @@ const logout = () => {
   border-radius: 24rpx;
   background: #fff;
   color: #ef4444;
+  font-size: 30rpx;
+  box-shadow: 0 12rpx 32rpx rgba(31, 106, 73, .05);
+}
+
+.cancel-account-button {
+  margin-top: 30rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 24rpx;
+  background: #fff7ed;
+  color: #c26a18;
   font-size: 30rpx;
   box-shadow: 0 12rpx 32rpx rgba(31, 106, 73, .05);
 }

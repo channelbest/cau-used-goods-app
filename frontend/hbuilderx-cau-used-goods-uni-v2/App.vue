@@ -1,6 +1,7 @@
 <script>
 import { listConversations } from './api/chat'
 import { tradeService } from './services/trade'
+import { updateMessageTabBadge } from './utils/tabbar'
 
 async function updateMessageBadge() {
   try {
@@ -11,11 +12,7 @@ async function updateMessageBadge() {
     const systemUnread = systemList.filter((item) => !(item.read ?? item.readStatus === 'READ')).length
     const chatUnread = (chatResult.items || []).reduce((sum, item) => sum + Number(item.unreadCount || 0), 0)
     const total = systemUnread + chatUnread
-    if (total > 0) {
-      uni.setTabBarBadge({ index: 2, text: total > 99 ? '99+' : String(total) })
-    } else {
-      uni.removeTabBarBadge({ index: 2 })
-    }
+    updateMessageTabBadge(total)
   } catch (error) {
     // 未登录或后端未启动时不打扰用户正常浏览。
   }

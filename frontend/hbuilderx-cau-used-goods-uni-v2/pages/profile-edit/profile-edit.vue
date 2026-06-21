@@ -1,20 +1,27 @@
 <template>
   <view class="page">
-    <view class="avatar-row">
-      <image v-if="avatarUrl" class="avatar" :src="avatarUrl" mode="aspectFill" />
-      <view v-else class="avatar placeholder">头像</view>
-      <button class="ghost-button" size="mini" :loading="uploading" @click="chooseAvatar">上传头像</button>
-    </view>
-
     <view class="form-card">
-      <view class="label">昵称</view>
-      <input class="input" v-model="nickname" placeholder="请输入昵称" />
-      <view class="label">手机号</view>
-      <input class="input" v-model="phone" type="number" maxlength="11" placeholder="请输入手机号" />
-      <button class="primary-button" :loading="loading" @click="saveProfile">保存资料</button>
+      <button class="profile-row avatar-picker" open-type="chooseAvatar" @chooseavatar="useWechatAvatar">
+        <text class="row-label">头像</text>
+        <view class="row-value">
+          <image v-if="avatarUrl" class="avatar" :src="avatarUrl" mode="aspectFill" />
+          <view v-else class="avatar placeholder">头像</view>
+          <text class="arrow">›</text>
+        </view>
+      </button>
+
+      <view class="profile-row">
+        <text class="row-label">昵称</text>
+        <input class="row-input" v-model="nickname" type="nickname" placeholder="请输入昵称" />
+      </view>
+
+      <view class="profile-row">
+        <text class="row-label">手机号</text>
+        <input class="row-input" v-model="phone" type="number" maxlength="11" placeholder="请输入手机号" />
+      </view>
     </view>
 
-    <button class="wechat-button" @click="askUseWechatProfile">沿用微信昵称和头像</button>
+    <button class="primary-button" :loading="loading" @click="saveProfile">保存资料</button>
   </view>
 </template>
 
@@ -29,7 +36,7 @@ const nickname = ref('')
 const phone = ref('')
 const avatarUrl = ref('')
 const loading = ref(false)
-const uploading = ref(false)
+const selectedAvatarPath = ref('')
 
 const normalizeAvatar = (url) => {
   if (!url) return ''
@@ -45,91 +52,48 @@ onLoad(() => {
   avatarUrl.value = normalizeAvatar(user.avatarUrl)
 })
 
-const askUseWechatProfile = () => {
-  uni.showModal({
-    title: '使用微信资料',
-    content: '是否沿用你的微信昵称和头像？',
-    confirmText: '使用',
-    cancelText: '不用',
-    success: (res) => {
-      if (res.confirm) useWechatProfile()
-    }
-  })
-}
-
-const useWechatProfile = () => {
-  if (!uni.getUserProfile) {
-    uni.showToast({ title: '当前工具不支持获取微信资料', icon: 'none' })
-    return
-  }
-  uni.getUserProfile({
-    desc: '用于完善个人资料',
-    success: async (res) => {
-      const info = res.userInfo || {}
-      nickname.value = info.nickName || nickname.value
-      avatarUrl.value = info.avatarUrl || avatarUrl.value
-      try {
-        const user = await updateProfile({
-          nickname: nickname.value,
-          avatarUrl: info.avatarUrl || ''
-        })
-        setUser(user)
-        avatarUrl.value = normalizeAvatar(user.avatarUrl)
-        uni.showToast({ title: '已使用微信资料', icon: 'success' })
-      } catch (error) {
-        uni.showToast({ title: error.message || '保存微信资料失败', icon: 'none' })
-      }
-    },
-    fail: () => uni.showToast({ title: '已取消使用微信资料', icon: 'none' })
-  })
-}
-
-const chooseAvatar = () => {
-  uni.chooseMedia({
-    count: 1,
-    mediaType: ['image'],
-    sourceType: ['album', 'camera'],
-    success: async (res) => {
-      const filePath = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
-      if (!filePath) return
-      uploading.value = true
-      uni.showLoading({ title: '上传中' })
-      try {
-        const data = await uploadAvatar(filePath)
-        if (data.user) {
-          setUser(data.user)
-          avatarUrl.value = normalizeAvatar(data.user.avatarUrl)
-        }
-        uni.showToast({ title: '头像已更新', icon: 'success' })
-      } catch (error) {
-        uni.showToast({ title: error.message || '头像上传失败', icon: 'none' })
-      } finally {
-        uploading.value = false
-        uni.hideLoading()
-      }
-    }
-  })
+const useWechatAvatar = (event) => {
+  const filePath = event?.detail?.avatarUrl || ''
+  if (!filePath) return
+  selectedAvatarPath.value = filePath
+  avatarUrl.value = filePath
 }
 
 const saveProfile = async () => {
   if (loading.value) return
+
   const nextNickname = nickname.value.trim()
   const nextPhone = phone.value.trim()
-  if (!nextNickname && !nextPhone) {
-    uni.showToast({ title: '请填写昵称或手机号', icon: 'none' })
+  if (!nextNickname && !nextPhone && !selectedAvatarPath.value) {
+    uni.showToast({ title: '请填写或选择要保存的资料', icon: 'none' })
     return
   }
   if (nextPhone && !/^1[3-9]\d{9}$/.test(nextPhone)) {
     uni.showToast({ title: '手机号格式不正确', icon: 'none' })
     return
   }
+
   const payload = {}
   if (nextNickname) payload.nickname = nextNickname
   if (nextPhone) payload.phone = nextPhone
+
   loading.value = true
   try {
-    const user = await updateProfile(payload)
-    setUser(user)
+    let user = null
+    if (selectedAvatarPath.value) {
+      const data = await uploadAvatar(selectedAvatarPath.value)
+      user = data.user || null
+      selectedAvatarPath.value = ''
+    }
+    if (Object.keys(payload).length) {
+      user = await updateProfile(payload)
+    }
+    if (user) {
+      setUser(user)
+      avatarUrl.value = normalizeAvatar(user.avatarUrl)
+      nickname.value = user.nickname || nextNickname
+      phone.value = user.phone || nextPhone
+    }
     uni.showToast({ title: '资料已保存', icon: 'success' })
     setTimeout(() => uni.navigateBack(), 600)
   } catch (error) {
@@ -141,14 +105,95 @@ const saveProfile = async () => {
 </script>
 
 <style scoped>
-.page { min-height: 100vh; padding: 32rpx; background: #f5f6f8; box-sizing: border-box; }
-.avatar-row { display: flex; align-items: center; justify-content: space-between; gap: 24rpx; margin-bottom: 28rpx; }
-.avatar { width: 120rpx; height: 120rpx; border-radius: 60rpx; background: #dce3ea; display: flex; align-items: center; justify-content: center; color: #8b98a7; }
-.form-card { padding: 32rpx; border-radius: 16rpx; background: #ffffff; }
-.label { margin: 24rpx 0 12rpx; color: #667085; font-size: 28rpx; }
-.input { height: 88rpx; padding: 0 24rpx; border-radius: 12rpx; background: #f0f3f7; font-size: 30rpx; box-sizing: border-box; }
-.primary-button { margin-top: 36rpx; height: 88rpx; line-height: 88rpx; border-radius: 12rpx; background: #17a84b; color: #ffffff; font-size: 30rpx; }
-.ghost-button { flex-shrink: 0; margin: 0; background: #ffffff; color: #17a84b; }
-.wechat-button { background: #ffffff; color: #17a84b; }
-.wechat-button { margin-top: 24rpx; }
+.page {
+  min-height: 100vh;
+  padding: 24rpx 24rpx 48rpx;
+  background: #f5f6f8;
+  box-sizing: border-box;
+}
+
+.form-card {
+  overflow: hidden;
+  border-radius: 18rpx;
+  background: #ffffff;
+}
+
+.profile-row {
+  display: flex;
+  width: 100%;
+  min-height: 112rpx;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  padding: 0 28rpx;
+  border-radius: 0;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.profile-row + .profile-row {
+  border-top: 1rpx solid #eef0f3;
+}
+
+.avatar-picker {
+  height: 144rpx;
+  line-height: normal;
+  text-align: left;
+}
+
+.avatar-picker::after {
+  border: none;
+}
+
+.row-label {
+  flex-shrink: 0;
+  color: #1f2933;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.row-value {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+}
+
+.avatar {
+  display: flex;
+  width: 92rpx;
+  height: 92rpx;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #dce3ea;
+  color: #98a2b3;
+  font-size: 24rpx;
+}
+
+.arrow {
+  color: #c0c7d0;
+  font-size: 42rpx;
+  line-height: 1;
+}
+
+.row-input {
+  flex: 1;
+  height: 112rpx;
+  padding-left: 32rpx;
+  color: #1f2933;
+  font-size: 30rpx;
+  text-align: right;
+  box-sizing: border-box;
+}
+
+.primary-button {
+  margin-top: 44rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 18rpx;
+  background: #17a84b;
+  color: #ffffff;
+  font-size: 30rpx;
+  font-weight: 700;
+}
 </style>
