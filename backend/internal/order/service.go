@@ -4,22 +4,23 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
 	"cau-used-goods-app/backend/internal/admin"
+	"cau-used-goods-app/backend/internal/chat"
 	"cau-used-goods-app/backend/internal/db"
-	"cau-used-goods-app/backend/internal/message"
 )
 
 type Service struct {
-	repo    *Repository
-	message *message.Service
-	admin   *admin.Service
+	repo  *Repository
+	chat  *chat.Service
+	admin *admin.Service
 }
 
-func NewService(repo *Repository, messageService *message.Service, adminService *admin.Service) *Service {
-	return &Service{repo: repo, message: messageService, admin: adminService}
+func NewService(repo *Repository, chatService *chat.Service, adminService *admin.Service) *Service {
+	return &Service{repo: repo, chat: chatService, admin: adminService}
 }
 
 type CreateOrderInput struct {
@@ -83,18 +84,7 @@ func (s *Service) Create(ctx context.Context, input CreateOrderInput) (*Order, e
 		return nil, err
 	}
 
-	// 发送订单创建消息通知卖家
-	if s.message != nil {
-		relatedType := message.RelatedTypeOrder
-		_, _ = s.message.Create(ctx, message.CreateMessageInput{
-			ReceiverID:  sellerID,
-			MessageType: message.MessageTypeOrderCreated,
-			Title:       "新订单提醒",
-			Content:     fmt.Sprintf("您的商品「%s」有新的订单，买家已预约，请尽快确认。", title),
-			RelatedType: &relatedType,
-			RelatedID:   &order.ID,
-		})
-	}
+	s.recordUserOrderEvent(ctx, order, input.BuyerID, chat.EventTypeOrderCreated, "买家已提交预约")
 
 	return order, nil
 }
@@ -127,18 +117,7 @@ func (s *Service) Confirm(ctx context.Context, input ConfirmOrderInput) (*Order,
 		return nil, err
 	}
 
-	// 发送订单确认消息通知买家
-	if s.message != nil {
-		relatedType := message.RelatedTypeOrder
-		_, _ = s.message.Create(ctx, message.CreateMessageInput{
-			ReceiverID:  order.BuyerID,
-			MessageType: message.MessageTypeOrderConfirmed,
-			Title:       "订单已确认",
-			Content:     fmt.Sprintf("卖家已确认您的订单「%s」，请按约定时间地点交易。", order.ProductTitleSnapshot),
-			RelatedType: &relatedType,
-			RelatedID:   &order.ID,
-		})
-	}
+	s.recordUserOrderEvent(ctx, order, input.SellerID, chat.EventTypeOrderConfirmed, "卖家已确认订单")
 
 	return s.repo.GetByID(ctx, input.OrderID)
 }
@@ -182,22 +161,12 @@ func (s *Service) Cancel(ctx context.Context, input CancelOrderInput) (*Order, e
 		return nil, err
 	}
 
-	// 发送订单取消消息通知对方
-	if s.message != nil {
-		relatedType := message.RelatedTypeOrder
-		receiverID := order.BuyerID
-		if input.UserID == order.BuyerID {
-			receiverID = order.SellerID
-		}
-		_, _ = s.message.Create(ctx, message.CreateMessageInput{
-			ReceiverID:  receiverID,
-			MessageType: message.MessageTypeOrderCanceled,
-			Title:       "订单已取消",
-			Content:     fmt.Sprintf("订单「%s」已被取消，原因：%s", order.ProductTitleSnapshot, input.Reason),
-			RelatedType: &relatedType,
-			RelatedID:   &order.ID,
-		})
+	cancelActor := "买家"
+	if input.UserID == order.SellerID {
+		cancelActor = "卖家"
 	}
+	s.recordUserOrderEvent(ctx, order, input.UserID, chat.EventTypeOrderCanceled,
+		fmt.Sprintf("%s已取消订单，原因：%s", cancelActor, input.Reason))
 
 	return s.repo.GetByID(ctx, input.OrderID)
 }
@@ -258,18 +227,7 @@ func (s *Service) Complete(ctx context.Context, input CompleteOrderInput) (*Orde
 		return nil, err
 	}
 
-	// 发送订单完成消息通知买家
-	if s.message != nil {
-		relatedType := message.RelatedTypeOrder
-		_, _ = s.message.Create(ctx, message.CreateMessageInput{
-			ReceiverID:  order.BuyerID,
-			MessageType: message.MessageTypeOrderConfirmed,
-			Title:       "交易完成",
-			Content:     fmt.Sprintf("订单「%s」已完成交易，欢迎评价。", order.ProductTitleSnapshot),
-			RelatedType: &relatedType,
-			RelatedID:   &order.ID,
-		})
-	}
+	s.recordUserOrderEvent(ctx, order, input.SellerID, chat.EventTypeOrderCompleted, "卖家已确认交易完成")
 
 	return s.repo.GetByID(ctx, input.OrderID)
 }
@@ -325,7 +283,8 @@ func (s *Service) AdminExceptionClose(ctx context.Context, input AdminExceptionC
 		return nil, err
 	}
 
-	s.notifyOrderExceptionClosed(ctx, input.AdminID, closedOrder, fmt.Sprintf("订单「%s」已由管理员异常关闭，原因：%s", order.ProductTitleSnapshot, input.Reason))
+	s.recordSystemOrderEvent(ctx, closedOrder, chat.EventTypeOrderExceptionClosed,
+		fmt.Sprintf("订单已由管理员异常关闭，原因：%s", input.Reason))
 
 	return s.repo.GetByID(ctx, input.OrderID)
 }
@@ -401,6 +360,7 @@ func (s *Service) AdminUpdateStatus(ctx context.Context, input AdminUpdateOrderS
 	if err != nil {
 		return nil, err
 	}
+	s.recordAdminStatusEvent(ctx, order, input.Status, input.Reason)
 	return s.repo.GetByID(ctx, input.OrderID)
 }
 
@@ -439,24 +399,6 @@ func (s *Service) exceptionCloseOrderTx(ctx context.Context, tx *sql.Tx, item Ac
 		return err
 	}
 	return s.logAdminActionTx(ctx, tx, adminID, admin.OperationOrderExceptionClose, admin.TargetTypeOrder, item.ID, description, ipAddress, relatedType, relatedID)
-}
-
-func (s *Service) notifyOrderExceptionClosed(ctx context.Context, adminID uint64, item AccountStatusClosedOrder, content string) {
-	if s.message == nil {
-		return
-	}
-	relatedType := message.RelatedTypeOrder
-	for _, receiverID := range []uint64{item.BuyerID, item.SellerID} {
-		_, _ = s.message.Create(ctx, message.CreateMessageInput{
-			ReceiverID:  receiverID,
-			SenderID:    &adminID,
-			MessageType: message.MessageTypeSystemNotice,
-			Title:       "订单异常关闭",
-			Content:     content,
-			RelatedType: &relatedType,
-			RelatedID:   &item.ID,
-		})
-	}
 }
 
 func isValidAdminOrderStatus(status string) bool {
@@ -562,6 +504,16 @@ func (s *Service) AutoExceptionClosePendingConfirmByUserTx(ctx context.Context, 
 	return orders, nil
 }
 
+func (s *Service) NotifyExceptionClosedOrders(ctx context.Context, orders []AccountStatusClosedOrder, reason string) {
+	for _, item := range orders {
+		content := "订单因相关账号状态异常，已由系统关闭"
+		if strings.TrimSpace(reason) != "" {
+			content = fmt.Sprintf("%s，原因：%s", content, strings.TrimSpace(reason))
+		}
+		s.recordSystemOrderEvent(ctx, item, chat.EventTypeOrderExceptionClosed, content)
+	}
+}
+
 func (s *Service) CancelExpiredOrders(ctx context.Context) (int, error) {
 	orders, err := s.repo.ListExpiredOrders(ctx)
 	if err != nil {
@@ -593,28 +545,73 @@ func (s *Service) CancelExpiredOrders(ctx context.Context) (int, error) {
 			continue
 		}
 
-		// 发送超时取消消息通知买卖双方
-		if s.message != nil {
-			relatedType := message.RelatedTypeOrder
-			_, _ = s.message.Create(ctx, message.CreateMessageInput{
-				ReceiverID:  order.BuyerID,
-				MessageType: message.MessageTypeOrderTimeout,
-				Title:       "订单超时取消",
-				Content:     fmt.Sprintf("订单「%s」因超时未确认，已自动取消。", order.ProductTitleSnapshot),
-				RelatedType: &relatedType,
-				RelatedID:   &order.ID,
-			})
-			_, _ = s.message.Create(ctx, message.CreateMessageInput{
-				ReceiverID:  order.SellerID,
-				MessageType: message.MessageTypeOrderTimeout,
-				Title:       "订单超时取消",
-				Content:     fmt.Sprintf("订单「%s」因超时未确认，已自动取消。", order.ProductTitleSnapshot),
-				RelatedType: &relatedType,
-				RelatedID:   &order.ID,
-			})
-		}
+		s.recordSystemOrderEvent(ctx, AccountStatusClosedOrder{
+			ID:                   order.ID,
+			BuyerID:              order.BuyerID,
+			SellerID:             order.SellerID,
+			ProductID:            order.ProductID,
+			ProductTitleSnapshot: order.ProductTitleSnapshot,
+		}, chat.EventTypeOrderTimeout, "订单因卖家超时未确认，已由系统自动取消")
 
 		cancelled++
 	}
 	return cancelled, firstErr
+}
+
+func (s *Service) recordUserOrderEvent(ctx context.Context, order *Order, actorID uint64, eventType, content string) {
+	if s.chat == nil || order == nil {
+		return
+	}
+	if _, err := s.chat.RecordOrderEvent(ctx, chat.OrderEventInput{
+		ProductID: order.ProductID,
+		BuyerID:   order.BuyerID,
+		SellerID:  order.SellerID,
+		OrderID:   order.ID,
+		ActorID:   &actorID,
+		ActorType: chat.ActorTypeUser,
+		EventType: eventType,
+		Content:   content,
+	}); err != nil {
+		log.Printf("record user order event failed: order=%d event=%s err=%v", order.ID, eventType, err)
+	}
+}
+
+func (s *Service) recordSystemOrderEvent(ctx context.Context, order AccountStatusClosedOrder, eventType, content string) {
+	if s.chat == nil {
+		return
+	}
+	if _, err := s.chat.RecordOrderEvent(ctx, chat.OrderEventInput{
+		ProductID: order.ProductID,
+		BuyerID:   order.BuyerID,
+		SellerID:  order.SellerID,
+		OrderID:   order.ID,
+		ActorType: chat.ActorTypeSystem,
+		EventType: eventType,
+		Content:   content,
+	}); err != nil {
+		log.Printf("record system order event failed: order=%d event=%s err=%v", order.ID, eventType, err)
+	}
+}
+
+func (s *Service) recordAdminStatusEvent(ctx context.Context, order *Order, status, reason string) {
+	if order == nil {
+		return
+	}
+	statusText := map[string]string{
+		"PENDING_CONFIRM": "待卖家确认",
+		"WAIT_MEET":       "待面交",
+		"COMPLETED":       "已完成",
+		"CANCELED":        "已取消",
+	}[status]
+	content := fmt.Sprintf("管理员已将订单状态调整为%s", statusText)
+	if strings.TrimSpace(reason) != "" {
+		content = fmt.Sprintf("%s，原因：%s", content, strings.TrimSpace(reason))
+	}
+	s.recordSystemOrderEvent(ctx, AccountStatusClosedOrder{
+		ID:                   order.ID,
+		BuyerID:              order.BuyerID,
+		SellerID:             order.SellerID,
+		ProductID:            order.ProductID,
+		ProductTitleSnapshot: order.ProductTitleSnapshot,
+	}, chat.EventTypeOrderStatusUpdated, content)
 }

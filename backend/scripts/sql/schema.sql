@@ -320,18 +320,23 @@ CREATE TABLE IF NOT EXISTS `chat_conversations` (
 CREATE TABLE IF NOT EXISTS `chat_messages` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '聊天消息ID',
   `conversation_id` BIGINT UNSIGNED NOT NULL COMMENT '聊天会话ID',
-  `sender_id` BIGINT UNSIGNED NOT NULL COMMENT '发送人ID',
-  `receiver_id` BIGINT UNSIGNED NOT NULL COMMENT '接收人ID',
+  `sender_id` BIGINT UNSIGNED NULL COMMENT '发送人ID，系统事件为空',
+  `receiver_id` BIGINT UNSIGNED NULL COMMENT '接收人ID，双方可见的系统事件为空',
   `content` VARCHAR(500) NOT NULL COMMENT '消息内容',
-  `message_type` VARCHAR(20) NOT NULL DEFAULT 'TEXT' COMMENT 'TEXT',
+  `message_type` VARCHAR(30) NOT NULL DEFAULT 'TEXT' COMMENT 'TEXT / ORDER_EVENT',
+  `actor_type` VARCHAR(20) NOT NULL DEFAULT 'USER' COMMENT 'USER / SYSTEM',
+  `order_id` BIGINT UNSIGNED NULL COMMENT '关联订单ID',
+  `event_type` VARCHAR(40) NULL COMMENT '订单事件类型',
   `read_status` VARCHAR(20) NOT NULL DEFAULT 'UNREAD' COMMENT 'UNREAD / READ',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发送时间',
   PRIMARY KEY (`id`),
   KEY `idx_chat_messages_conversation_time` (`conversation_id`, `create_time`),
   KEY `idx_chat_messages_receiver_read` (`receiver_id`, `read_status`),
+  KEY `idx_chat_messages_order` (`order_id`),
   CONSTRAINT `fk_chat_messages_conversation` FOREIGN KEY (`conversation_id`) REFERENCES `chat_conversations` (`id`),
   CONSTRAINT `fk_chat_messages_sender` FOREIGN KEY (`sender_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `fk_chat_messages_receiver` FOREIGN KEY (`receiver_id`) REFERENCES `users` (`id`)
+  CONSTRAINT `fk_chat_messages_receiver` FOREIGN KEY (`receiver_id`) REFERENCES `users` (`id`),
+  CONSTRAINT `fk_chat_messages_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='聊天消息表';
 CREATE TABLE IF NOT EXISTS `appeals` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '申诉ID',

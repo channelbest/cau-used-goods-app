@@ -39,9 +39,6 @@ func (s *Service) CreateOrGetConversation(ctx context.Context, input CreateConve
 	if product.SellerID == input.UserID {
 		return nil, fmt.Errorf("cannot chat with yourself")
 	}
-	if product.Status == "LOCKED" || product.Status == "OFF_SHELF" || product.Status == "SOLD" || product.Status == "DELETED" {
-		return nil, fmt.Errorf("product not available for chat")
-	}
 
 	conversation, err := s.repo.FindConversation(ctx, product.ID, input.UserID, product.SellerID)
 	if err != nil {
@@ -52,6 +49,9 @@ func (s *Service) CreateOrGetConversation(ctx context.Context, input CreateConve
 			return nil, err
 		}
 		return conversation, nil
+	}
+	if product.Status == "LOCKED" || product.Status == "OFF_SHELF" || product.Status == "SOLD" || product.Status == "DELETED" {
+		return nil, fmt.Errorf("product not available for chat")
 	}
 
 	return s.repo.CreateConversation(ctx, product.ID, input.UserID, product.SellerID)
@@ -93,6 +93,43 @@ func (s *Service) SendMessage(ctx context.Context, input SendMessageInput) (*Mes
 		receiverID = conversation.BuyerID
 	}
 	return s.repo.CreateMessage(ctx, conversation, input.SenderID, receiverID, input.Content)
+}
+
+func (s *Service) RecordOrderEvent(ctx context.Context, input OrderEventInput) (*Message, error) {
+	input.Content = strings.TrimSpace(input.Content)
+	input.ActorType = strings.ToUpper(strings.TrimSpace(input.ActorType))
+	input.EventType = strings.ToUpper(strings.TrimSpace(input.EventType))
+	if input.ProductID == 0 || input.BuyerID == 0 || input.SellerID == 0 || input.OrderID == 0 {
+		return nil, fmt.Errorf("order event relation is required")
+	}
+	if input.BuyerID == input.SellerID {
+		return nil, fmt.Errorf("buyer and seller must be different")
+	}
+	if input.Content == "" {
+		return nil, fmt.Errorf("order event content is required")
+	}
+	if len([]rune(input.Content)) > 500 {
+		return nil, fmt.Errorf("order event content cannot exceed 500 characters")
+	}
+	if input.ActorType != ActorTypeUser && input.ActorType != ActorTypeSystem {
+		return nil, fmt.Errorf("invalid order event actor type")
+	}
+	if input.ActorType == ActorTypeUser {
+		if input.ActorID == nil || (*input.ActorID != input.BuyerID && *input.ActorID != input.SellerID) {
+			return nil, fmt.Errorf("order event actor is not a participant")
+		}
+	} else {
+		input.ActorID = nil
+	}
+	if !isOrderEventType(input.EventType) {
+		return nil, fmt.Errorf("invalid order event type")
+	}
+
+	conversation, err := s.repo.EnsureConversation(ctx, input.ProductID, input.BuyerID, input.SellerID)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.CreateOrderEvent(ctx, conversation, input)
 }
 
 func (s *Service) MarkRead(ctx context.Context, conversationID, userID uint64) (int64, error) {
@@ -147,4 +184,19 @@ func normalizePage(page, pageSize int) (int, int) {
 		pageSize = 100
 	}
 	return page, pageSize
+}
+
+func isOrderEventType(value string) bool {
+	switch value {
+	case EventTypeOrderCreated,
+		EventTypeOrderConfirmed,
+		EventTypeOrderCanceled,
+		EventTypeOrderCompleted,
+		EventTypeOrderTimeout,
+		EventTypeOrderExceptionClosed,
+		EventTypeOrderStatusUpdated:
+		return true
+	default:
+		return false
+	}
 }

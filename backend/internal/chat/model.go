@@ -6,7 +6,23 @@ const (
 )
 
 const (
-	MessageTypeText = "TEXT"
+	MessageTypeText       = "TEXT"
+	MessageTypeOrderEvent = "ORDER_EVENT"
+)
+
+const (
+	ActorTypeUser   = "USER"
+	ActorTypeSystem = "SYSTEM"
+)
+
+const (
+	EventTypeOrderCreated         = "ORDER_CREATED"
+	EventTypeOrderConfirmed       = "ORDER_CONFIRMED"
+	EventTypeOrderCanceled        = "ORDER_CANCELED"
+	EventTypeOrderCompleted       = "ORDER_COMPLETED"
+	EventTypeOrderTimeout         = "ORDER_TIMEOUT"
+	EventTypeOrderExceptionClosed = "ORDER_EXCEPTION_CLOSED"
+	EventTypeOrderStatusUpdated   = "ORDER_STATUS_UPDATED"
 )
 
 const (
@@ -39,14 +55,28 @@ type ConversationDetail struct {
 }
 
 type Message struct {
-	ID             uint64 `json:"id"`
-	ConversationID uint64 `json:"conversationId"`
-	SenderID       uint64 `json:"senderId"`
-	ReceiverID     uint64 `json:"receiverId"`
-	Content        string `json:"content"`
-	MessageType    string `json:"messageType"`
-	ReadStatus     string `json:"readStatus"`
-	CreateTime     string `json:"createTime"`
+	ID             uint64  `json:"id"`
+	ConversationID uint64  `json:"conversationId"`
+	SenderID       *uint64 `json:"senderId,omitempty"`
+	ReceiverID     *uint64 `json:"receiverId,omitempty"`
+	Content        string  `json:"content"`
+	MessageType    string  `json:"messageType"`
+	ActorType      string  `json:"actorType"`
+	OrderID        *uint64 `json:"orderId,omitempty"`
+	EventType      *string `json:"eventType,omitempty"`
+	ReadStatus     string  `json:"readStatus"`
+	CreateTime     string  `json:"createTime"`
+}
+
+type OrderEventInput struct {
+	ProductID uint64
+	BuyerID   uint64
+	SellerID  uint64
+	OrderID   uint64
+	ActorID   *uint64
+	ActorType string
+	EventType string
+	Content   string
 }
 
 type ProductForChat struct {

@@ -45,6 +45,7 @@ type ProductLifecycle interface {
 type OrderLifecycle interface {
 	CountBlockingOrdersTx(ctx context.Context, tx *sql.Tx, userID uint64) (sellerPendingConfirm, sellerWaitMeet, buyerPendingConfirm, buyerWaitMeet int, err error)
 	AutoExceptionClosePendingConfirmByUserTx(ctx context.Context, tx *sql.Tx, userID, adminID uint64, reason string, ipAddress *string, relatedType *string, relatedID *uint64) ([]order.AccountStatusClosedOrder, error)
+	NotifyExceptionClosedOrders(ctx context.Context, orders []order.AccountStatusClosedOrder, reason string)
 }
 
 type MessageNotifier interface {
@@ -79,7 +80,7 @@ type UpdateAccountStatusInput struct {
 }
 
 type AccountStatusChangeEffects struct {
-	ClosedOrders []order.AccountStatusClosedOrder
+	ClosedOrders     []order.AccountStatusClosedOrder
 	OffShelfProducts []uint64
 }
 
@@ -226,26 +227,11 @@ func (s *Service) UpdateAccountStatus(ctx context.Context, adminID uint64, input
 }
 
 func (s *Service) notifyAccountStatusChange(ctx context.Context, adminID uint64, input UpdateAccountStatusInput, effects *AccountStatusChangeEffects) {
+	if effects != nil && s.orders != nil {
+		s.orders.NotifyExceptionClosedOrders(ctx, effects.ClosedOrders, input.Reason)
+	}
 	if s.messages == nil {
 		return
-	}
-	if effects != nil {
-		relatedType := message.RelatedTypeOrder
-		for _, item := range effects.ClosedOrders {
-			relatedID := item.ID
-			content := fmt.Sprintf("订单「%s」因相关账号状态异常，已由管理员异常关闭。", item.ProductTitleSnapshot)
-			for _, receiverID := range []uint64{item.BuyerID, item.SellerID} {
-				_, _ = s.messages.Create(ctx, message.CreateMessageInput{
-					ReceiverID:  receiverID,
-					SenderID:    &adminID,
-					MessageType: message.MessageTypeSystemNotice,
-					Title:       "订单异常关闭",
-					Content:     content,
-					RelatedType: &relatedType,
-					RelatedID:   &relatedID,
-				})
-			}
-		}
 	}
 
 	relatedType := message.RelatedTypeUser

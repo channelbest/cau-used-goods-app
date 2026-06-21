@@ -1,4 +1,5 @@
 backend/config/config.yaml
 backend/*.exe
 backend/*.test
+.gocache/
 frontend/cau-used-goods-uni/unpackage/dist/dev/.sourcemap/
