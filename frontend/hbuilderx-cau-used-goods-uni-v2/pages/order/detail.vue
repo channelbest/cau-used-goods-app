@@ -1,11 +1,10 @@
 <template>
   <view v-if="order" class="page">
-    <view class="card status-card">
+    <view :class="['card', 'status-card', 'result-status-card', statusCardClass]">
       <view class="status-copy">
         <text class="status-title">{{ status.label }}</text>
         <text class="status-tip">{{ statusTip }}</text>
       </view>
-      <StatusBadge :label="status.label" :tone="status.tone" />
     </view>
 
     <view class="card product-card" @click="openProduct">
@@ -67,6 +66,9 @@
       <button class="btn btn-plain" @click="appeal">申诉订单问题</button>
       <button class="btn btn-plain" @click="report">举报交易问题</button>
     </view>
+    <view v-if="fromMessage" class="actions message-center-actions">
+      <button class="btn btn-plain" @click="goMessageCenter">返回消息中心</button>
+    </view>
     <view v-if="closeModal.visible" class="modal-mask" @click="closeCloseModal">
       <view class="reason-sheet" @click.stop>
         <view class="sheet-title">异常关闭订单</view>
@@ -102,7 +104,6 @@
 import { onLoad } from '@dcloudio/uni-app'
 import { computed, reactive, ref } from 'vue'
 import ProductRow from '../../components/ProductRow.vue'
-import StatusBadge from '../../components/StatusBadge.vue'
 import { exceptionCloseAdminOrder } from '../../api/admin'
 import { getPublicProfile } from '../../api/user'
 import { tradeService } from '../../services/trade'
@@ -117,11 +118,20 @@ const adminView = ref(false)
 const readonlyMode = ref(false)
 const relatedType = ref('')
 const relatedId = ref('')
+const fromMessage = ref(false)
 const submitting = ref(false)
 const closeModal = reactive({ visible: false, reason: '', note: '', responsibleParty: 'SELLER' })
 const closeReasons = ['买卖双方协商取消', '交易存在纠纷', '商品违规或信息异常', '长时间未完成交易', '其他原因']
 const currentUserId = computed(() => String(getUser()?.id || ''))
 const status = computed(() => ORDER_STATUS[order.value?.status] || { label: '', tone: 'muted' })
+const statusCardClass = computed(() => ({
+  PENDING_CONFIRM: 'pending-status-card',
+  WAIT_MEET: 'active-status-card',
+  COMPLETED: 'success-status-card',
+  CANCELED: 'danger-status-card',
+  CANCELLED: 'danger-status-card',
+  EXCEPTION_CLOSED: 'danger-status-card'
+}[order.value?.status] || 'neutral-status-card'))
 const isSeller = computed(() => String(order.value?.sellerId) === currentUserId.value)
 const canCancel = computed(() => ['PENDING_CONFIRM', 'WAIT_MEET'].includes(order.value?.status))
 const canAdminExceptionClose = computed(() => ['PENDING_CONFIRM', 'WAIT_MEET'].includes(order.value?.status))
@@ -157,6 +167,7 @@ onLoad((options) => {
   readonlyMode.value = options.readonly === '1' || options.readonly === 1
   relatedType.value = String(options.relatedType || '').toUpperCase()
   relatedId.value = options.relatedId || ''
+  fromMessage.value = options.fromMessage === '1' || options.fromMessage === 1
   load()
 })
 
@@ -293,6 +304,10 @@ function report() {
 function appeal() {
   navigate('/pages/interaction/appeal', { targetType: 'ORDER', targetId: id })
 }
+
+function goMessageCenter() {
+  uni.switchTab({ url: '/pages/messages/messages' })
+}
 </script>
 
 <style scoped lang="scss">
@@ -319,6 +334,46 @@ function appeal() {
   align-items: flex-start;
   justify-content: space-between;
   gap: 18rpx;
+}
+
+.result-status-card {
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  text-align: center;
+}
+
+.result-status-card .status-copy {
+  align-items: center;
+}
+
+.result-status-card .status-tip {
+  color: rgba(255, 255, 255, .82);
+}
+
+.success-status-card {
+  background: linear-gradient(135deg, #23734f, #3e9b72);
+  box-shadow: 0 12rpx 32rpx rgba(35, 115, 79, .18);
+}
+
+.pending-status-card {
+  background: linear-gradient(135deg, #d99424, #edb64b);
+  box-shadow: 0 12rpx 32rpx rgba(190, 126, 24, .18);
+}
+
+.active-status-card {
+  background: linear-gradient(135deg, #3478b8, #55a0d8);
+  box-shadow: 0 12rpx 32rpx rgba(38, 105, 165, .18);
+}
+
+.danger-status-card {
+  background: linear-gradient(135deg, #c9443e, #e0645d);
+  box-shadow: 0 12rpx 32rpx rgba(180, 48, 43, .18);
+}
+
+.neutral-status-card {
+  background: linear-gradient(135deg, #65746c, #87958e);
+  box-shadow: 0 12rpx 32rpx rgba(68, 83, 75, .16);
 }
 
 .status-copy {
@@ -382,6 +437,10 @@ function appeal() {
 
 .admin-actions {
   margin-bottom: 20rpx;
+}
+
+.message-center-actions {
+  margin-top: 20rpx;
 }
 
 .btn-danger {

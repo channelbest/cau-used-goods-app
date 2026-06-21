@@ -6,7 +6,7 @@ export const createAppointment = (data) => request({
   method: 'POST',
   data: { ...data, productId: Number(data.productId) }
 })
-export const getOrders = (role) => request({ url: '/orders', data: { role } })
+export const getOrders = (role, params = {}) => request({ url: '/orders', data: { role, ...params } })
 export const getOrder = (id) => request({ url: `/orders/${id}` })
 export const changeOrderStatus = (id, action, data = {}) => request({
   url: `/orders/${id}/${action}`,
@@ -49,6 +49,7 @@ export const createReport = async (data) => {
   })
 }
 export const getReports = () => request({ url: '/reports/my' })
+export const getReport = (id) => request({ url: `/reports/${id}` })
 export const createAppeal = async (data) => {
   const evidenceUrls = []
   for (const filePath of data.images || []) evidenceUrls.push(await uploadImage(filePath))

@@ -91,6 +91,7 @@ const draft = ref('')
 const loading = ref(false)
 const sending = ref(false)
 const targetProfile = ref(null)
+const targetBannedSnapshot = ref(false)
 const mineProfile = ref(null)
 const profileMap = ref({})
 const swipedMessageId = ref('')
@@ -110,18 +111,13 @@ const productTitle = computed(() => title.value || '商品详情')
 const pick = (...values) => values.find((value) => value !== undefined && value !== null && value !== '') || ''
 const BANNED_USER_TEXT = '！该用户已被封禁，无法查找'
 const sellerIdText = computed(() => pick(targetUserId.value, targetProfile.value?.id, targetProfile.value?.userId))
-const looksLikeEncodedNickname = (value = '') => /^%(?:[0-9A-Fa-f]{2})+/.test(String(value))
 const targetAccountStatus = computed(() => accountStatusOf(targetProfile.value?.user || targetProfile.value || {}))
 const isTargetUnavailable = computed(() => (
   isBannedUserStatus(targetAccountStatus.value)
-  || looksLikeEncodedNickname(targetProfile.value?.nickname)
-  || looksLikeEncodedNickname(targetNicknameSnapshot.value)
+  || targetBannedSnapshot.value
 ))
 const sellerName = computed(() => {
   const raw = targetProfile.value?.nickname || targetNicknameSnapshot.value || '对方'
-  if (looksLikeEncodedNickname(raw)) {
-    try { return decodeURIComponent(raw) } catch (e) { return raw }
-  }
   return raw
 })
 const targetAvatar = computed(() => normalizeImage(pick(targetProfile.value?.avatarUrl, targetProfile.value?.avatar, targetProfile.value?.avatar_url, targetAvatarSnapshot.value)))
@@ -269,7 +265,10 @@ const loadProfiles = async () => {
       const avatarUrl = await localizeHttpImage(normalizeImage(pick(data?.avatarUrl, data?.avatar, data?.avatar_url)))
       const profile = { ...data, avatarUrl }
       setProfile(id, profile)
-      if (String(id) === String(targetUserId.value)) targetProfile.value = profile
+      if (String(id) === String(targetUserId.value)) {
+        targetProfile.value = profile
+        targetBannedSnapshot.value = isBannedUserStatus(accountStatusOf(profile?.user || profile))
+      }
       if (String(id) === String(currentUserId.value)) mineProfile.value = profile
     }).catch(() => {})
   ))
@@ -282,7 +281,9 @@ async function loadInitialTargetProfile() {
   if (!data) return
   const avatarUrl = await localizeHttpImage(normalizeImage(pick(data?.avatarUrl, data?.avatar, data?.avatar_url)))
   const profile = { ...data, avatarUrl }
-  targetNicknameSnapshot.value = isBannedUserStatus(accountStatusOf(profile?.user || profile))
+  const targetBanned = isBannedUserStatus(accountStatusOf(profile?.user || profile))
+  targetBannedSnapshot.value = targetBanned
+  targetNicknameSnapshot.value = targetBanned
     ? BANNED_USER_TEXT
     : profile.nickname || targetNicknameSnapshot.value
   targetAvatarSnapshot.value = avatarUrl || targetAvatarSnapshot.value
@@ -420,6 +421,7 @@ onLoad(async (options) => {
   targetUserId.value = options.targetUserId || ''
   targetNicknameSnapshot.value = options.targetNickname ? decodeURIComponent(options.targetNickname) : ''
   targetAvatarSnapshot.value = options.targetAvatar ? decodeURIComponent(options.targetAvatar) : ''
+  targetBannedSnapshot.value = options.targetBanned === '1' || options.targetBanned === 1
   productId.value = options.productId || ''
   seedInitialProfiles()
   await loadInitialTargetProfile()

@@ -6,21 +6,20 @@
         <view v-else class="avatar text-avatar">{{ displayName.slice(0, 1) }}</view>
         <view class="info">
           <text class="name">{{ displayName }}</text>
-          <view class="tags">
-            <text class="tag">{{ profile.authStatus === 'VERIFIED' ? '学生已认证' : '学生未认证' }}</text>
-            <text class="tag" :class="{ danger: !profile.tradeAvailable }">{{ profile.tradeAvailable ? '交易正常' : '交易受限' }}</text>
+          <view class="status-row">
+            <view class="tags">
+              <text class="tag">{{ profile.authStatus === 'VERIFIED' ? '学生已认证' : '学生未认证' }}</text>
+              <text class="tag" :class="{ danger: !profile.tradeAvailable }">{{ profile.tradeAvailable ? '交易正常' : '交易受限' }}</text>
+            </view>
+            <button v-if="!adminView && !isSelf" class="report-inline" :disabled="isCurrentUserRestricted" @click="reportUser">举报</button>
           </view>
         </view>
       </view>
-      <view class="actions">
-        <template v-if="adminView">
+      <view v-if="adminView" class="actions">
+        <template>
           <button v-if="accountStatus === 'NORMAL'" class="disable-btn" @click="changeUserStatus('DISABLED')">禁用</button>
           <button v-if="accountStatus === 'NORMAL' || accountStatus === 'DISABLED'" class="ban-btn" @click="changeUserStatus('BANNED')">封禁</button>
           <button v-if="canRecoverUser" class="recover-btn" @click="changeUserStatus('NORMAL')">{{ recoverButtonText }}</button>
-        </template>
-        <template v-else>
-          <button v-if="!isSelf" class="chat-btn" :disabled="isCurrentUserRestricted" @click="chatWithUser">聊一聊</button>
-          <button class="report-btn" :disabled="isCurrentUserRestricted" @click="reportUser">举报该用户</button>
         </template>
       </view>
     </view>
@@ -67,7 +66,6 @@ import { onLoad } from '@dcloudio/uni-app'
 import { getPublicProfile } from '../../api/user'
 import { getAdminUserDetail, updateAdminUserStatus } from '../../api/admin'
 import { listProducts } from '../../api/product'
-import { createOrGetConversation } from '../../api/chat'
 import { getUser } from '../../utils/auth'
 import { BASE_URL } from '../../utils/request'
 import { navigate, showError } from '../../utils/navigation'
@@ -77,8 +75,6 @@ const userId = ref('')
 const adminView = ref(false)
 const relatedType = ref('')
 const relatedId = ref('')
-const preferredProductId = ref('')
-const preferredProductTitle = ref('')
 const profile = ref(null)
 const adminUser = ref(null)
 const products = ref([])
@@ -152,8 +148,6 @@ onLoad(async (options) => {
   adminView.value = options.adminView === '1' || options.adminView === 1
   relatedType.value = String(options.relatedType || '').toUpperCase()
   relatedId.value = options.relatedId || ''
-  preferredProductId.value = options.productId || ''
-  preferredProductTitle.value = options.productTitle ? decodeURIComponent(options.productTitle) : ''
   if (!userId.value) {
     showError(new Error('用户不存在'))
     return
@@ -229,35 +223,6 @@ function changeUserStatus(status) {
   })
 }
 
-async function chatWithUser() {
-  if (isCurrentUserRestricted.value) {
-    uni.showToast({ title: currentUserRestrictionText.value, icon: 'none' })
-    return
-  }
-  const product = preferredProductId.value
-    ? { id: preferredProductId.value, title: preferredProductTitle.value || products.value[0]?.title || '商品咨询' }
-    : products.value[0]
-  if (!product?.id) {
-    uni.showToast({ title: 'TA 暂无可咨询商品', icon: 'none' })
-    return
-  }
-  const productId = Number(product.id)
-  if (!Number.isFinite(productId) || productId <= 0) {
-    uni.showToast({ title: '商品信息异常，暂时无法聊天', icon: 'none' })
-    return
-  }
-  try {
-    const conversation = await createOrGetConversation(productId)
-    navigate('/pages/chat/chat', {
-      conversationId: conversation.id,
-      title: product.title,
-      targetUserId: userId.value,
-      productId
-    })
-  } catch (error) {
-    uni.showToast({ title: error.message || '暂时无法发起聊天', icon: 'none' })
-  }
-}
 </script>
 
 <style scoped>
@@ -270,13 +235,14 @@ async function chatWithUser() {
 .image-avatar { background: #e8ecef; }
 .info { flex: 1; min-width: 0; }
 .name { display: block; overflow: hidden; color: #222; font-size: 40rpx; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
-.tags { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 18rpx; }
+.status-row { display: flex; align-items: center; gap: 12rpx; margin-top: 18rpx; }
+.tags { display: flex; min-width: 0; flex: 1; flex-wrap: wrap; gap: 12rpx; }
 .tag { padding: 8rpx 16rpx; border-radius: 999rpx; background: #edf6f1; color: #23734f; font-size: 23rpx; }
 .tag.danger { background: #fff1ef; color: #d85c45; }
+.report-inline { flex-shrink: 0; height: 54rpx; margin: 0 0 0 auto; padding: 0 18rpx; border-radius: 999rpx; background: #fff1ef; color: #d85c45; font-size: 22rpx; line-height: 54rpx; }
+.report-inline::after { border: 0; }
 .actions { display: flex; gap: 16rpx; margin-top: 28rpx; }
-.chat-btn, .report-btn, .disable-btn, .ban-btn, .recover-btn { flex: 1; height: 72rpx; border-radius: 999rpx; font-size: 26rpx; line-height: 72rpx; }
-.chat-btn { background: #23734f; color: #fff; }
-.report-btn { background: #fff1ef; color: #d85c45; }
+.disable-btn, .ban-btn, .recover-btn { flex: 1; height: 72rpx; border-radius: 999rpx; font-size: 26rpx; line-height: 72rpx; }
 .disable-btn { background: #fff7e6; color: #a96500; }
 .ban-btn { background: #fff1f2; color: #ef4444; }
 .recover-btn { background: #e7f4ec; color: #23734f; }

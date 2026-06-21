@@ -100,11 +100,54 @@ function normalizeAppeal(item = {}) {
   }
 }
 
+function normalizeReport(item = {}) {
+  return {
+    ...item,
+    id: String(item.id),
+    reason: item.reasonType,
+    reasonLabel: REPORT_REASON[item.reasonType] || item.reasonType,
+    detail: item.description,
+    result: item.handleResult,
+    targetTypeLabel: TARGET_TYPE[item.targetType] || item.targetType,
+    createdAt: formatDateTime(item.createTime || item.createdAt),
+    handleTime: formatDateTime(item.handleTime)
+  }
+}
+
+async function getOrderWithImage(id) {
+  const detail = normalizeOrder(await api.getOrder(id))
+  if (detail.product?.image) return detail
+
+  for (const role of ['buyer', 'seller']) {
+    try {
+      const result = await api.getOrders(role, { pageSize: 100 })
+      const matched = (result?.items || []).find((item) => String(item.id) === String(id))
+      if (!matched) continue
+
+      const orderFromList = normalizeOrder(matched)
+      if (!orderFromList.product?.image) continue
+      return {
+        ...detail,
+        productImage: orderFromList.product.image,
+        product: {
+          ...detail.product,
+          ...orderFromList.product,
+          image: orderFromList.product.image
+        }
+      }
+    } catch (error) {
+      // 当前用户可能只拥有买家或卖家其中一种订单列表权限，继续尝试另一种角色。
+    }
+  }
+
+  return detail
+}
+
 export const tradeService = {
   getProduct: async (id) => normalizeProduct(await api.getProduct(id)),
   createAppointment: async (data) => normalizeOrder(await api.createAppointment(data)),
   getOrders: async (role) => (await api.getOrders(role)).items.map(normalizeOrder),
-  getOrder: async (id) => normalizeOrder(await api.getOrder(id)),
+  getOrder: getOrderWithImage,
   getAdminOrder: async (id) => {
     const result = await getAdminOrders('ALL', { pageSize: 200 })
     const list = result?.items || []
@@ -130,16 +173,8 @@ export const tradeService = {
   deleteAllMessages: api.deleteAllMessages,
   createReview: api.createReview,
   createReport: api.createReport,
-  getReports: async () => (await api.getReports()).items.map((item) => ({
-    ...item,
-    id: String(item.id),
-    reason: item.reasonType,
-    reasonLabel: REPORT_REASON[item.reasonType] || item.reasonType,
-    detail: item.description,
-    result: item.handleResult,
-    targetTypeLabel: TARGET_TYPE[item.targetType] || item.targetType,
-    createdAt: formatDateTime(item.createTime || item.createdAt)
-  })),
+  getReports: async () => (await api.getReports()).items.map(normalizeReport),
+  getReport: async (id) => normalizeReport(await api.getReport(id)),
   createAppeal: api.createAppeal,
   getAppeals: async (params) => {
     const result = await api.getAppeals(params)

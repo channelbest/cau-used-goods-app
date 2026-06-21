@@ -1,7 +1,7 @@
 <template>
   <view class="page">
     <view class="header">
-      <view>
+      <view class="header-copy">
         <text class="title">系统消息</text>
         <text class="subtitle">订单进度、举报处理和平台通知</text>
       </view>
@@ -82,7 +82,7 @@ async function open(item) {
     const orderId = orderTargetId(item)
     if (orderId) {
       await markOneRead(item)
-      navigate('/pages/order/detail', { id: orderId })
+      navigate('/pages/order/detail', { id: orderId, fromMessage: 1 })
       return
     }
   }
@@ -194,10 +194,11 @@ function remove(item) {
 <style scoped>
 .page { min-height: 100vh; padding: 30rpx 28rpx 48rpx; background: #f5f8f6; box-sizing: border-box; }
 .header { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; margin-bottom: 24rpx; padding: 28rpx 26rpx; border-radius: 28rpx; background: linear-gradient(135deg, #23734f, #3e9b72); box-shadow: 0 12rpx 32rpx rgba(35, 115, 79, .18); }
+.header-copy { flex: 1; min-width: 0; }
 .title, .subtitle { display: block; }
 .title { color: #fff; font-size: 42rpx; font-weight: 800; }
 .subtitle { margin-top: 10rpx; color: rgba(255,255,255,.78); font-size: 24rpx; }
-.read-all { flex-shrink: 0; min-width: 136rpx; height: 56rpx; padding: 0 18rpx; border-radius: 999rpx; background: rgba(255,255,255,.94); color: #23734f; font-size: 24rpx; line-height: 56rpx; }
+.read-all { flex-shrink: 0; min-width: 136rpx; height: 56rpx; margin: 0 0 0 auto; padding: 0 18rpx; border-radius: 999rpx; background: rgba(255,255,255,.94); color: #23734f; font-size: 24rpx; line-height: 56rpx; }
 .read-all[disabled], .delete-action.disabled { opacity: .56; }
 .list { display: flex; flex-direction: column; gap: 22rpx; }
 .swipe-wrap { position: relative; overflow: hidden; border-radius: 28rpx; }

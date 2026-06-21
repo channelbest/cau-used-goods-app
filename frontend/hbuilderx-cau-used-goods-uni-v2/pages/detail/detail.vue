@@ -66,7 +66,7 @@
         >
           !
         </button>
-        <button class="chat" :disabled="readonlyMode || isOwnProduct || currentUserRestricted" @click="chat">聊一聊</button>
+        <button class="chat" :disabled="!canChat" @click="chat">聊一聊</button>
         <button class="primary" :disabled="readonlyMode || isOwnProduct || product.status !== 'ON_SALE' || currentUserRestricted" @click="reserve">
           {{ actionText }}
         </button>
@@ -86,6 +86,7 @@ import {
   addFavorite,
   checkFavorite,
   getProductById,
+  listMyOrders,
   listMyProducts,
   listCategories,
   removeFavorite
@@ -109,6 +110,7 @@ const relatedId = ref('')
 const bannedSellerBlocked = ref(false)
 const sellerProfile = ref(null)
 const sellerAvatarFile = ref('')
+const isReservedBuyer = ref(false)
 
 const currentUserStatus = computed(() => {
   const user = getUser() || {}
@@ -123,6 +125,11 @@ const currentUserRestrictionText = computed(() => {
   if (isBannedUserStatus(status)) return '账号已被永久封禁，无法进行操作'
   if (isDisabledUserStatus(status)) return '账号已被禁用，无法进行操作'
   return ''
+})
+const canChat = computed(() => {
+  if (readonlyMode.value || isOwnProduct.value || currentUserRestricted.value) return false
+  if (product.value?.status === 'ON_SALE') return true
+  return product.value?.status === 'LOCKED' && isReservedBuyer.value
 })
 
 const pick = (...values) => values.find((value) => value !== undefined && value !== null && value !== '') || ''
@@ -315,6 +322,7 @@ function openSeller() {
 async function chat() {
   if (!ensureVerified() || !product.value?.id) return
   if (isOwnProduct.value) return toast('不能和自己的商品聊天')
+  if (!canChat.value) return toast('该商品已被预约，仅当前买家可以联系卖家')
   try {
     const conversation = await createOrGetConversation(product.value.id)
     const currentUserId = Number(getUser()?.id || getUser()?.userId || 0)
@@ -327,6 +335,21 @@ async function chat() {
     })
   } catch (error) {
     toast('暂时无法发起私信')
+  }
+}
+
+async function loadChatEligibility(productId) {
+  isReservedBuyer.value = false
+  if (!productId || product.value?.status !== 'LOCKED' || !getToken()) return
+  try {
+    const result = await listMyOrders({ role: 'buyer', pageSize: 100 })
+    const list = Array.isArray(result) ? result : (result?.items || result?.list || [])
+    isReservedBuyer.value = list.some((order) => (
+      String(order.productId || order.product?.id) === String(productId)
+      && ['PENDING_CONFIRM', 'WAIT_MEET'].includes(order.status)
+    ))
+  } catch (error) {
+    isReservedBuyer.value = false
   }
 }
 
@@ -392,6 +415,7 @@ async function loadOwnProductFallback(id, options = {}) {
     failedImages.value = []
     await loadSellerProfile()
     await loadFavoriteState(id)
+    await loadChatEligibility(id)
     return true
   } catch (error) {
     return false
@@ -443,6 +467,7 @@ onLoad(async (options) => {
       failedImages.value = []
       await loadSellerProfile()
       await loadFavoriteState(id)
+      await loadChatEligibility(id)
       if (!readonlyMode.value) toast('商品暂不可查看，显示最近一次详情')
       return
     }

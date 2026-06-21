@@ -10,25 +10,23 @@
 
     <view v-if="products.length" class="list">
       <view v-for="item in products" :key="item.id" class="product">
-        <view class="product-main">
-          <image v-if="item.coverImage" class="cover" :src="item.coverImage" mode="aspectFill" @click="openDetail(item.id)" />
-          <view v-else class="cover placeholder" @click="openDetail(item.id)">暂无图片</view>
+        <view class="product-main" @click="openDetail(item.id)">
+          <image v-if="item.coverImage" class="cover" :src="item.coverImage" mode="aspectFill" />
+          <view v-else class="cover placeholder">暂无图片</view>
           <view class="content">
             <view class="top">
-              <view class="name" @click="openDetail(item.id)">{{ item.title }}</view>
+              <view class="name">{{ item.title }}</view>
               <text class="status" :class="item.status">{{ getStatusText(item.status) }}</text>
             </view>
             <view class="meta">{{ item.category }} · {{ item.conditionText }}</view>
             <text class="price">￥{{ item.priceText }}</text>
           </view>
         </view>
-        <view class="actions">
+        <view v-if="canEdit(item)" class="actions">
           <button v-if="item.status === 'ON_SALE'" class="action muted-action" @click="changeStatus(item, 'OFF_SHELF')">下架</button>
           <button v-if="item.status === 'OFF_SHELF'" class="action primary-action" @click="changeStatus(item, 'ON_SALE')">上架</button>
-          <button v-if="item.status !== 'ON_SALE'" class="action warning-action" @click="appealProduct(item)">申诉</button>
           <button v-if="canEdit(item)" class="action" @click="editProduct(item)">编辑</button>
           <button v-if="canEdit(item)" class="action danger-action" @click="deleteMyProduct(item)">删除</button>
-          <button class="action" @click="openDetail(item.id)">查看</button>
         </view>
       </view>
     </view>
@@ -115,10 +113,6 @@ const editProduct = (item) => {
   uni.switchTab({ url: '/pages/publish/publish' })
 }
 
-const appealProduct = (item) => {
-  uni.navigateTo({ url: `/pages/interaction/appeal?targetType=PRODUCT&targetId=${item.id}` })
-}
-
 const changeStatus = (item, status) => {
   const title = status === 'ON_SALE' ? '确认重新上架？' : '确认下架商品？'
   uni.showModal({
@@ -165,7 +159,7 @@ onPullDownRefresh(loadData)
 .title { color: #26342f; font-size: 38rpx; font-weight: 700; }
 .muted, .load-state { color: #929c98; font-size: 23rpx; }
 .publish, .empty-button { height: 66rpx; border-radius: 999rpx; background: #23734f; color: #fff; font-size: 26rpx; line-height: 66rpx; }
-.publish { width: 128rpx; }
+.publish { width: 128rpx; margin: 0 0 0 auto; flex-shrink: 0; }
 .list { display: flex; flex-direction: column; gap: 22rpx; }
 .product { display: flex; flex-direction: column; gap: 18rpx; padding: 22rpx; border-radius: 24rpx; background: #fff; box-shadow: 0 8rpx 24rpx rgba(28, 68, 52, .05); }
 .product-main { display: flex; min-width: 0; }
@@ -184,7 +178,6 @@ onPullDownRefresh(loadData)
 .action { min-width: 104rpx; height: 58rpx; padding: 0 18rpx; border-radius: 999rpx; background: #edf4f1; color: #23734f; font-size: 24rpx; line-height: 58rpx; }
 .muted-action { background: #f4f1ed; color: #9a7745; }
 .primary-action { background: #23734f; color: #fff; }
-.warning-action { background: #fff7e6; color: #a96500; }
 .danger-action { background: #fff1ef; color: #d85c45; }
 .empty { margin-top: 140rpx; padding: 44rpx 28rpx; border-radius: 18rpx; background: #fff; text-align: center; }
 .empty-title { margin-bottom: 12rpx; color: #26342f; font-size: 32rpx; font-weight: 700; }

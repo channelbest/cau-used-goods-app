@@ -5,7 +5,6 @@
         <text class="title">消息</text>
         <text class="subtitle">系统通知和用户私信都会在这里</text>
       </view>
-      <view v-if="unreadTotal" class="total-badge">{{ unreadTotal > 99 ? '99+' : unreadTotal }}</view>
     </view>
 
     <view v-if="systemEntry" class="conversation pinned" @click="openSystemMessages">
@@ -405,8 +404,9 @@ async function openChat(item) {
     conversationId: item.id,
     title: conversationProductTitle(item) || '私信沟通',
     targetUserId,
-    targetNickname: targetBanned ? encodeURIComponent('！该用户已被封禁，无法查找') : (targetNickname ? encodeURIComponent(targetNickname) : ''),
-    targetAvatar: !targetBanned && targetAvatar ? encodeURIComponent(targetAvatar) : '',
+    targetNickname: targetBanned ? '！该用户已被封禁，无法查找' : targetNickname,
+    targetAvatar: !targetBanned ? targetAvatar : '',
+    targetBanned: targetBanned ? 1 : 0,
     productId: conversationProductId(item)
   })
 }
@@ -449,8 +449,7 @@ onShow(load)
 .title, .subtitle { display: block; }
 .title { color: #202124; font-size: 42rpx; font-weight: 800; }
 .subtitle { margin-top: 8rpx; color: #8a8f94; font-size: 24rpx; }
-.total-badge, .badge { display: flex; align-items: center; justify-content: center; border-radius: 999rpx; background: #f04444; color: #fff; font-size: 21rpx; }
-.total-badge { min-width: 42rpx; height: 42rpx; padding: 0 10rpx; }
+.badge { display: flex; align-items: center; justify-content: center; border-radius: 999rpx; background: #f04444; color: #fff; font-size: 21rpx; }
 .badge { min-width: 34rpx; height: 34rpx; padding: 0 8rpx; flex-shrink: 0; }
 .list { display: flex; flex-direction: column; gap: 16rpx; margin-top: 16rpx; }
 .swipe-wrap { position: relative; overflow: hidden; border-radius: 24rpx; }
