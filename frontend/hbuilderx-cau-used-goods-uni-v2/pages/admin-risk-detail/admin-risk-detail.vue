@@ -9,7 +9,10 @@
           <view class="title">{{ itemTitle(item) }}</view>
           <view class="sub">{{ targetText(item.targetType) }} #{{ item.targetId }}</view>
         </view>
-        <view :class="['status-badge', item.status]">{{ statusText(item.status) }}</view>
+        <view class="badge-row">
+          <view class="status-badge" :style="statusBadgeStyle(item.status)">{{ statusText(item.status) }}</view>
+          <view v-if="isUserAppeal" class="risk-badge">{{ userAppealRiskText }}</view>
+        </view>
       </view>
 
       <view class="desc">{{ itemDescription(item) }}</view>
@@ -60,8 +63,8 @@
 
       <view v-if="canHandle(item.status)" class="actions">
         <button v-if="item.status === 'PENDING'" size="mini" class="process" @click="handleCurrent('PROCESSING')">开始处理</button>
-        <button size="mini" class="pass" @click="handleCurrent('APPROVED')">{{ mode === 'REPORT' ? '处理完成' : '通过申诉' }}</button>
-        <button size="mini" class="reject" @click="openReasonModal">{{ mode === 'REPORT' ? '驳回' : '驳回申诉' }}</button>
+        <button v-if="item.status === 'PROCESSING'" size="mini" class="pass" @click="handleCurrent('APPROVED')">{{ mode === 'REPORT' ? '处理完成' : '通过申诉' }}</button>
+        <button v-if="item.status === 'PROCESSING'" size="mini" class="reject" @click="openReasonModal">{{ mode === 'REPORT' ? '驳回' : '驳回申诉' }}</button>
       </view>
     </view>
 
@@ -116,6 +119,12 @@ const reasonOptions = computed(() => mode.value === 'REPORT'
 
 const targetProduct = computed(() => item.value?.targetType === 'PRODUCT' ? product.value : null)
 const targetOrder = computed(() => item.value?.targetType === 'ORDER' ? order.value : null)
+const isUserAppeal = computed(() => mode.value === 'APPEAL' && item.value?.targetType === 'USER')
+const userAppealRiskText = computed(() => {
+  const status = normalizeStatus(item.value?.status)
+  if (status === 'PENDING' || status === 'PROCESSING') return '需超管'
+  return '账号解封'
+})
 const productInfoTitle = computed(() => targetProduct.value?.title || `商品 #${item.value?.targetId || ''}`)
 const productInfoPrice = computed(() => targetProduct.value?.price ?? 0)
 const productInfoStatus = computed(() => productStatusText(targetProduct.value?.status))
@@ -196,7 +205,25 @@ const load = async () => {
 }
 
 const targetText = (targetType) => ({ PRODUCT: '商品', USER: '用户', ORDER: '订单', REPORT: '举报' }[targetType] || targetType || '对象')
-const statusText = (status) => ({ PENDING: '待处理', PROCESSING: '处理中', RESOLVED: '已处理', APPROVED: '已通过', REJECTED: '已驳回', CLOSED: '已关闭' }[status] || status || '未知')
+const normalizeStatus = (status) => String(status || '').trim().toUpperCase()
+const statusText = (status) => ({ PENDING: '待处理', PROCESSING: '处理中', RESOLVED: '已处理', APPROVED: '已通过', REJECTED: '已驳回', CLOSED: '已关闭' }[normalizeStatus(status)] || status || '未知')
+const statusTone = (status) => {
+  const value = normalizeStatus(status)
+  if (value === 'APPROVED' || value === 'RESOLVED') return 'success'
+  if (value === 'PENDING') return 'warning'
+  if (value === 'PROCESSING') return 'primary'
+  if (value === 'REJECTED') return 'danger'
+  if (value === 'CLOSED') return 'muted'
+  return 'muted'
+}
+const statusStyleMap = {
+  warning: { background: '#fff7e6', color: '#b66a00' },
+  primary: { background: '#eff6ff', color: '#2563eb' },
+  success: { background: '#dcfce7', color: '#16a34a' },
+  danger: { background: '#fee2e2', color: '#ef4444' },
+  muted: { background: '#eef2f6', color: '#667085' }
+}
+const statusBadgeStyle = (status) => statusStyleMap[statusTone(status)] || statusStyleMap.muted
 const reasonText = (reasonType) => ({ FAKE: '虚假信息', FRAUD: '疑似诈骗', PROHIBITED: '违规商品', INAPPROPRIATE: '不当内容', HARASSMENT: '骚扰行为', OTHER: '其他原因' }[reasonType] || reasonType || '举报')
 const itemTitle = (record) => mode.value === 'REPORT' ? reasonText(record.reasonType) : (record.reason || '申诉')
 const itemDescription = (record) => record.description || record.reason || '暂无补充说明'
@@ -341,9 +368,9 @@ const submitReject = async () => {
 .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20rpx; }
 .title { font-size: 34rpx; font-weight: 700; color: #1f2933; }
 .sub { margin-top: 8rpx; font-size: 24rpx; color: #8a96a8; }
+.badge-row { display: flex; flex-shrink: 0; align-items: center; gap: 8rpx; flex-wrap: wrap; justify-content: flex-end; }
 .status-badge { flex-shrink: 0; padding: 8rpx 14rpx; border-radius: 999rpx; background: #eef2f6; color: #667085; font-size: 22rpx; }
-.status-badge.PENDING, .status-badge.PROCESSING { background: #fee2e2; color: #ef4444; }
-.status-badge.APPROVED, .status-badge.RESOLVED { background: #dcfce7; color: #16a34a; }
+.risk-badge { flex-shrink: 0; padding: 8rpx 14rpx; border-radius: 999rpx; background: #fff1f2; color: #be123c; font-size: 22rpx; }
 .desc { margin-top: 18rpx; color: #667085; font-size: 26rpx; line-height: 38rpx; }
 .meta-row { display: flex; justify-content: space-between; gap: 20rpx; margin-top: 20rpx; font-size: 22rpx; color: #98a2b3; }
 .target-product { display: flex; align-items: center; gap: 18rpx; padding: 18rpx; margin-top: 24rpx; border-radius: 14rpx; background: #f8fafc; }

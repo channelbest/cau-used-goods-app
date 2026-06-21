@@ -55,8 +55,8 @@
       <view class="actions">
         <button class="mini" @click="toggleRelated(item)">关联信息</button>
         <button class="mini" @click="goStudentAuth(item)">认证状态</button>
-        <button v-if="item.accountStatus !== 'DISABLED'" class="mini warn" @click="changeStatus(item, 'DISABLED')">禁用</button>
-        <button v-if="item.accountStatus !== 'BANNED'" class="mini danger" @click="changeStatus(item, 'BANNED')">封禁</button>
+        <button v-if="item.accountStatus === 'NORMAL'" class="mini warn" @click="changeStatus(item, 'DISABLED')">禁用</button>
+        <button v-if="item.accountStatus === 'NORMAL' || item.accountStatus === 'DISABLED'" class="mini danger" @click="changeStatus(item, 'BANNED')">封禁</button>
         <button v-if="canRecoverUser(item)" class="mini ok" @click="changeStatus(item, 'NORMAL')">{{ recoverButtonText(item) }}</button>
         <button v-if="canChangeRole(item)" class="mini role" @click="changeRole(item)">{{ roleActionText(item) }}</button>
       </view>
@@ -193,7 +193,6 @@ function accountText(status) {
 function canRecoverUser(item) {
   if (!item) return false
   if (item.accountStatus === 'DISABLED') return true
-  if (item.accountStatus === 'BANNED') return isSuperAdmin.value
   return false
 }
 

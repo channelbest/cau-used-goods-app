@@ -43,7 +43,10 @@
           <view class="case-title">{{ itemTitle(item) }}</view>
           <view class="case-sub">{{ targetText(item.targetType) }} #{{ item.targetId }}</view>
         </view>
-        <view :class="['status-badge', item.status]">{{ statusText(item.status) }}</view>
+        <view class="badge-row">
+          <view class="status-badge" :style="statusBadgeStyle(item.status)">{{ statusText(item.status) }}</view>
+          <view v-if="isUserAppeal(item)" class="risk-badge">{{ userAppealRiskText(item) }}</view>
+        </view>
       </view>
 
       <view class="case-desc">{{ itemDescription(item) }}</view>
@@ -282,6 +285,7 @@ const reasonText = (reasonType) => {
 }
 
 const statusText = (status) => {
+  status = normalizeStatus(status)
   const map = {
     PENDING: '待处理',
     PROCESSING: '处理中',
@@ -291,6 +295,36 @@ const statusText = (status) => {
     CLOSED: '已关闭'
   }
   return map[status] || status || '未知'
+}
+
+const normalizeStatus = (status) => String(status || '').trim().toUpperCase()
+
+const statusTone = (status) => {
+  const value = normalizeStatus(status)
+  if (value === 'APPROVED' || value === 'RESOLVED') return 'success'
+  if (value === 'PENDING') return 'warning'
+  if (value === 'PROCESSING') return 'primary'
+  if (value === 'REJECTED') return 'danger'
+  if (value === 'CLOSED') return 'muted'
+  return 'muted'
+}
+
+const statusStyleMap = {
+  warning: { background: '#fff7e6', color: '#b66a00' },
+  primary: { background: '#eff6ff', color: '#2563eb' },
+  success: { background: '#dcfce7', color: '#16a34a' },
+  danger: { background: '#fee2e2', color: '#ef4444' },
+  muted: { background: '#eef2f6', color: '#667085' }
+}
+
+const statusBadgeStyle = (status) => statusStyleMap[statusTone(status)] || statusStyleMap.muted
+
+const isUserAppeal = (item) => activeMode.value === 'APPEAL' && item?.targetType === 'USER'
+
+const userAppealRiskText = (item) => {
+  const status = normalizeStatus(item?.status)
+  if (status === 'PENDING' || status === 'PROCESSING') return '需超管'
+  return '账号解封'
 }
 
 const itemTitle = (item) => {
@@ -572,16 +606,22 @@ const handleCurrent = async (id, status) => {
   font-size: 22rpx;
 }
 
-.status-badge.PENDING,
-.status-badge.PROCESSING {
-  background: #fee2e2;
-  color: #ef4444;
+.badge-row {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8rpx;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
-.status-badge.RESOLVED,
-.status-badge.APPROVED {
-  background: #dcfce7;
-  color: #16a34a;
+.risk-badge {
+  flex-shrink: 0;
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  background: #fff1f2;
+  color: #be123c;
+  font-size: 22rpx;
 }
 
 .case-desc,
