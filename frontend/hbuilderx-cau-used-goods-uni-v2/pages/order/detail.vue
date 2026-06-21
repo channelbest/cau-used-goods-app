@@ -63,6 +63,7 @@
       <button v-if="order.status === 'COMPLETED' && !isSeller" class="btn btn-primary" :disabled="hasReviewed" @click="review">
         {{ hasReviewed ? '已评价' : '去评价' }}
       </button>
+      <button class="btn btn-plain" @click="openOrderChat">联系对方</button>
       <button class="btn btn-plain" @click="appeal">申诉订单问题</button>
       <button class="btn btn-plain" @click="report">举报交易问题</button>
     </view>
@@ -105,6 +106,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import { computed, reactive, ref } from 'vue'
 import ProductRow from '../../components/ProductRow.vue'
 import { exceptionCloseAdminOrder } from '../../api/admin'
+import { createOrGetConversation, listConversations } from '../../api/chat'
 import { getPublicProfile } from '../../api/user'
 import { tradeService } from '../../services/trade'
 import { getUser } from '../../utils/auth'
@@ -122,7 +124,7 @@ const fromMessage = ref(false)
 const submitting = ref(false)
 const closeModal = reactive({ visible: false, reason: '', note: '', responsibleParty: 'SELLER' })
 const closeReasons = ['买卖双方协商取消', '交易存在纠纷', '商品违规或信息异常', '长时间未完成交易', '其他原因']
-const currentUserId = computed(() => String(getUser()?.id || ''))
+const currentUserId = computed(() => String(getUser()?.id || getUser()?.userId || ''))
 const status = computed(() => ORDER_STATUS[order.value?.status] || { label: '', tone: 'muted' })
 const statusCardClass = computed(() => ({
   PENDING_CONFIRM: 'pending-status-card',
@@ -136,6 +138,7 @@ const isSeller = computed(() => String(order.value?.sellerId) === currentUserId.
 const canCancel = computed(() => ['PENDING_CONFIRM', 'WAIT_MEET'].includes(order.value?.status))
 const canAdminExceptionClose = computed(() => ['PENDING_CONFIRM', 'WAIT_MEET'].includes(order.value?.status))
 const sellerId = computed(() => order.value?.sellerId || order.value?.seller?.id || '')
+const buyerId = computed(() => order.value?.buyerId || order.value?.buyer?.id || '')
 const sellerName = computed(() => (
   sellerProfile.value?.nickname
   || order.value?.sellerName
@@ -296,6 +299,48 @@ function openSeller() {
     productId,
     productTitle: order.value?.product?.title || order.value?.productTitleSnapshot || ''
   })
+}
+
+async function findSellerConversation(productId) {
+  let page = 1
+  const pageSize = 100
+  while (page <= 20) {
+    const result = await listConversations({ page, pageSize })
+    const items = result?.items || []
+    const matched = items.find((item) => (
+      String(item.productId || item.product_id) === String(productId)
+      && (!buyerId.value || String(item.buyerId || item.buyer_id) === String(buyerId.value))
+    ))
+    if (matched) return matched
+    if (page * pageSize >= Number(result?.total || items.length) || items.length < pageSize) return null
+    page += 1
+  }
+  return null
+}
+
+async function openOrderChat() {
+  const productId = order.value?.product?.id || order.value?.productId
+  if (!productId) {
+    showError(new Error('商品信息缺失，暂时无法进入会话'))
+    return
+  }
+  try {
+    const conversation = isSeller.value
+      ? await findSellerConversation(productId)
+      : await createOrGetConversation(productId)
+    if (!conversation?.id) throw new Error('订单会话尚未创建')
+    const targetUserId = String(conversation.buyerId || conversation.buyer_id) === currentUserId.value
+      ? (conversation.sellerId || conversation.seller_id)
+      : (conversation.buyerId || conversation.buyer_id)
+    navigate('/pages/chat/chat', {
+      conversationId: conversation.id,
+      title: order.value?.product?.title || order.value?.productTitleSnapshot || '订单商品',
+      targetUserId,
+      productId
+    })
+  } catch (error) {
+    showError(new Error(error?.message || '暂时无法进入订单会话'))
+  }
 }
 
 function report() {
