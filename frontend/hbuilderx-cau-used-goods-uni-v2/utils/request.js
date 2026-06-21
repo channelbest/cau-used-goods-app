@@ -8,6 +8,12 @@ export const normalizeErrorMessage = (message, fallback = '请求失败，请稍
   const lower = value.toLowerCase()
   if (lower.includes('already have an active order')) return '你已预约过该商品，不能重复提交预约'
   if (lower.includes('cannot buy your own product')) return '不能预约自己发布的商品'
+  if (lower.includes('you already have an active appeal')) return '该对象已有待处理或处理中的申诉，请勿重复提交'
+  if (lower.includes('appeal target not found')) return '申诉对象不存在或已被删除'
+  if (lower.includes('appeal cannot be closed')) return '该申诉当前状态不能撤回'
+  if (lower.includes('appeal already handled')) return '该申诉已处理，不能重复操作'
+  if (lower.includes('appeal must be marked processing')) return '请先将申诉标记为处理中'
+  if (lower.includes('user appeal target must be restored before approval')) return '账号解封申诉需先恢复账号，再标记为通过'
   if (lower.includes('not found')) return '未找到相关数据'
   if (lower.includes('already reviewed')) return '该订单已经评价过'
   if (lower.includes('unauthorized') || lower.includes('token')) return '登录已过期，请重新登录'
