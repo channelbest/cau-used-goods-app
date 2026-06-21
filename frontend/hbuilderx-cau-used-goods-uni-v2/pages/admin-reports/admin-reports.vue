@@ -274,6 +274,10 @@ const targetText = (targetType) => {
 
 const reasonText = (reasonType) => {
   const map = {
+    FAKE_PRODUCT: '虚假或违规商品',
+    INAPPROPRIATE_CONTENT: '不当内容',
+    SCAM: '欺诈风险',
+    TRADE_DISPUTE: '交易纠纷',
     FAKE: '虚假信息',
     FRAUD: '疑似诈骗',
     PROHIBITED: '违规商品',

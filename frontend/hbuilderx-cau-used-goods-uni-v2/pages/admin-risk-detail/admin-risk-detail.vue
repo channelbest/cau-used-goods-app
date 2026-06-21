@@ -224,7 +224,18 @@ const statusStyleMap = {
   muted: { background: '#eef2f6', color: '#667085' }
 }
 const statusBadgeStyle = (status) => statusStyleMap[statusTone(status)] || statusStyleMap.muted
-const reasonText = (reasonType) => ({ FAKE: '虚假信息', FRAUD: '疑似诈骗', PROHIBITED: '违规商品', INAPPROPRIATE: '不当内容', HARASSMENT: '骚扰行为', OTHER: '其他原因' }[reasonType] || reasonType || '举报')
+const reasonText = (reasonType) => ({
+  FAKE_PRODUCT: '虚假或违规商品',
+  INAPPROPRIATE_CONTENT: '不当内容',
+  SCAM: '欺诈风险',
+  TRADE_DISPUTE: '交易纠纷',
+  FAKE: '虚假信息',
+  FRAUD: '疑似诈骗',
+  PROHIBITED: '违规商品',
+  INAPPROPRIATE: '不当内容',
+  HARASSMENT: '骚扰行为',
+  OTHER: '其他原因'
+}[reasonType] || reasonType || '举报')
 const itemTitle = (record) => mode.value === 'REPORT' ? reasonText(record.reasonType) : (record.reason || '申诉')
 const itemDescription = (record) => record.description || record.reason || '暂无补充说明'
 const actorName = (record) => mode.value === 'REPORT'

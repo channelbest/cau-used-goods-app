@@ -82,7 +82,7 @@
         <view class="related-title">相关举报</view>
         <view v-if="related.reports.length === 0" class="muted">暂无举报</view>
         <view v-for="report in related.reports" :key="report.id" class="related-line">
-          {{ report.relation === 'SUBMITTED' ? '发起' : '被举报' }} · {{ report.reasonType }} · {{ reportStatusText(report.status) }}
+          {{ report.relation === 'SUBMITTED' ? '发起' : '被举报' }} · {{ reportReasonText(report.reasonType) }} · {{ reportStatusText(report.status) }}
         </view>
       </view>
     </view>
@@ -226,6 +226,21 @@ function orderStatusText(status) {
 
 function reportStatusText(status) {
   return { PENDING: '待处理', PROCESSING: '处理中', APPROVED: '已处理', REJECTED: '已驳回', CLOSED: '已关闭' }[status] || status || '未知'
+}
+
+function reportReasonText(reasonType) {
+  return {
+    FAKE_PRODUCT: '虚假或违规商品',
+    INAPPROPRIATE_CONTENT: '不当内容',
+    SCAM: '欺诈风险',
+    TRADE_DISPUTE: '交易纠纷',
+    FAKE: '虚假信息',
+    FRAUD: '疑似诈骗',
+    PROHIBITED: '违规商品',
+    INAPPROPRIATE: '不当内容',
+    HARASSMENT: '骚扰行为',
+    OTHER: '其他原因'
+  }[reasonType] || reasonType || '举报'
 }
 
 function openUserHome(item) {

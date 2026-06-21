@@ -1,6 +1,14 @@
 <template>
   <view v-if="message" class="page">
-    <view class="hero" :class="{ 'auth-hero': isStudentAuthResult || isAccountStatusChange || isAdminProductOffShelf, 'notice-hero': isPlainNotice }">
+    <view class="hero" :class="{
+      'auth-hero': isStudentAuthResult || isAccountStatusChange || isAdminProductOffShelf || isAppealResult || isReportResult,
+      'danger-hero': (isStudentAuthResult && !studentAuthPassed)
+        || (isAccountStatusChange && accountStatusAbnormal)
+        || isAdminProductOffShelf
+        || (isAppealResult && !appealApproved)
+        || (isReportResult && !reportApproved),
+      'notice-hero': isPlainNotice && !isAppealResult && !isReportResult
+    }">
       <template v-if="isStudentAuthResult">
         <text class="auth-title">{{ studentAuthPassed ? '学生认证通过' : '学生认证未通过' }}</text>
       </template>
@@ -9,6 +17,12 @@
       </template>
       <template v-else-if="isAdminProductOffShelf">
         <text class="auth-title">商品已下架</text>
+      </template>
+      <template v-else-if="isAppealResult">
+        <text class="auth-title">{{ appealApproved ? '申诉通过' : '申诉不通过' }}</text>
+      </template>
+      <template v-else-if="isReportResult">
+        <text class="auth-title">{{ reportApproved ? '举报通过' : '举报不通过' }}</text>
       </template>
       <template v-else-if="isPlainNotice">
         <text class="hero-title">{{ noticeTitle }}</text>
@@ -25,18 +39,20 @@
       <button v-else class="btn primary" @click="goAppeal">去申诉</button>
     </view>
 
-    <view v-else-if="isAccountStatusChange && accountStatusAbnormal" class="account-status-content">
-      <view class="status-reason">
-        <text class="reason-label">原因</text>
-        <text class="reason-value">{{ accountStatusReason }}</text>
-        <text class="reason-hint">涉及的所有交易都被关闭</text>
-      </view>
-      <view v-if="hasRelatedTransactions" class="transactions-hint">
-        <text class="hint-text">{{ transactionHint }}</text>
-      </view>
-      <view class="auth-actions">
-        <button class="btn primary" @click="goAppeal">去申诉</button>
-      </view>
+    <view v-else-if="isAccountStatusChange" class="account-status-content">
+      <template v-if="accountStatusAbnormal">
+        <view class="status-reason">
+          <text class="reason-label">原因</text>
+          <text class="reason-value">{{ accountStatusReason }}</text>
+          <text class="reason-hint">涉及的所有交易都被关闭</text>
+        </view>
+        <view v-if="hasRelatedTransactions" class="transactions-hint">
+          <text class="hint-text">{{ transactionHint }}</text>
+        </view>
+        <view class="auth-actions">
+          <button class="btn primary" @click="goAppeal">去申诉</button>
+        </view>
+      </template>
     </view>
 
     <view v-else-if="isAdminProductOffShelf" class="account-status-content">
@@ -59,6 +75,66 @@
       </view>
       <view class="auth-actions">
         <button class="btn primary" @click="goProductAppeal">去申诉</button>
+      </view>
+    </view>
+
+    <view v-else-if="isAppealResult" class="account-status-content">
+      <view class="status-reason appeal-result-card">
+        <view class="appeal-result-row">
+          <text class="reason-label">处理对象</text>
+          <text class="reason-value">{{ appealTargetText }}</text>
+        </view>
+        <view v-if="appealDetail?.reason" class="appeal-result-row">
+          <text class="reason-label">申诉内容</text>
+          <text class="reason-value">{{ appealDetail.reason }}</text>
+        </view>
+        <view class="appeal-result-row">
+          <text class="reason-label">处理说明</text>
+          <text class="reason-value">{{ appealHandleResult }}</text>
+        </view>
+      </view>
+      <view v-if="resultRelatedCard" class="card related-card" @click="openResultRelated">
+        <image v-if="resultRelatedCard.image" class="cover" :src="resultRelatedCard.image" mode="aspectFill" />
+        <view v-else class="cover placeholder">{{ resultRelatedCard.placeholder }}</view>
+        <view class="related-body">
+          <view class="related-head">
+            <text class="related-label">{{ resultRelatedCard.label }}</text>
+            <text :class="['mini-status', resultRelatedCard.statusClass]">{{ resultRelatedCard.status }}</text>
+          </view>
+          <text class="related-title">{{ resultRelatedCard.title }}</text>
+          <text class="related-meta">{{ resultRelatedCard.meta }}</text>
+        </view>
+        <text class="arrow">›</text>
+      </view>
+    </view>
+
+    <view v-else-if="isReportResult" class="account-status-content">
+      <view class="status-reason appeal-result-card">
+        <view class="appeal-result-row">
+          <text class="reason-label">处理对象</text>
+          <text class="reason-value">{{ reportTargetText }}</text>
+        </view>
+        <view v-if="reportDetail?.reasonLabel" class="appeal-result-row">
+          <text class="reason-label">举报内容</text>
+          <text class="reason-value">{{ reportDetail.reasonLabel }}{{ reportDetail.detail ? `：${reportDetail.detail}` : '' }}</text>
+        </view>
+        <view class="appeal-result-row">
+          <text class="reason-label">处理说明</text>
+          <text class="reason-value">{{ reportHandleResult }}</text>
+        </view>
+      </view>
+      <view v-if="resultRelatedCard" class="card related-card" @click="openResultRelated">
+        <image v-if="resultRelatedCard.image" class="cover" :src="resultRelatedCard.image" mode="aspectFill" />
+        <view v-else class="cover placeholder">{{ resultRelatedCard.placeholder }}</view>
+        <view class="related-body">
+          <view class="related-head">
+            <text class="related-label">{{ resultRelatedCard.label }}</text>
+            <text :class="['mini-status', resultRelatedCard.statusClass]">{{ resultRelatedCard.status }}</text>
+          </view>
+          <text class="related-title">{{ resultRelatedCard.title }}</text>
+          <text class="related-meta">{{ resultRelatedCard.meta }}</text>
+        </view>
+        <text class="arrow">›</text>
       </view>
     </view>
 
@@ -89,10 +165,11 @@
       <text class="arrow">›</text>
     </view>
 
-    <view class="actions">
+    </template>
+
+    <view class="actions message-center-actions">
       <button class="btn plain" @click="goMessages">返回消息中心</button>
     </view>
-    </template>
   </view>
 
   <view v-else class="page loading-page">
@@ -105,10 +182,15 @@ import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { tradeService } from '../../services/trade'
 import { getProductById, listMyProducts } from '../../api/product'
+import { getPublicProfile } from '../../api/user'
 import { navigate, showError } from '../../utils/navigation'
 import { BASE_URL } from '../../utils/request'
+import { getBrowseHistory } from '../../utils/browse-history'
 
 const message = ref(null)
+const appealDetail = ref(null)
+const reportDetail = ref(null)
+const resultRelatedTarget = ref(null)
 
 const isStudentAuthResult = computed(() => (
   message.value?.title === '学生认证审核结果'
@@ -163,6 +245,59 @@ const productOffShelfReason = computed(() => {
   const match = content.match(/原因[：:]\s*(.+)/)
   return match ? match[1].trim() : ''
 })
+const isAppealResult = computed(() => (
+  message.value?.title === '申诉处理结果'
+  || String(message.value?.content || '').includes('申诉已处理')
+))
+const appealApproved = computed(() => {
+  const status = String(appealDetail.value?.status || '').toUpperCase()
+  if (status) return status === 'APPROVED'
+  return String(message.value?.content || '').includes('APPROVED')
+})
+const appealTargetText = computed(() => {
+  const appeal = appealDetail.value
+  if (!appeal) return '本次申诉'
+  const label = {
+    PRODUCT: '商品',
+    USER: '账号',
+    ORDER: '订单',
+    REPORT: '举报'
+  }[appeal.targetType] || '相关内容'
+  return `${label}（ID：${appeal.targetId}）`
+})
+const appealHandleResult = computed(() => {
+  if (appealDetail.value?.result) return appealDetail.value.result
+  const content = String(message.value?.content || '')
+  const match = content.match(/处理说明[：:]\s*(.+)/)
+  return match ? match[1].trim() : '暂无处理说明'
+})
+const isReportResult = computed(() => (
+  message.value?.title === '举报处理结果'
+  || String(message.value?.content || '').includes('举报已处理')
+))
+const reportApproved = computed(() => {
+  const status = String(reportDetail.value?.status || '').toUpperCase()
+  if (status) return status === 'APPROVED'
+  return String(message.value?.content || '').includes('APPROVED')
+})
+const reportTargetText = computed(() => formatProcessedTarget(reportDetail.value))
+const reportHandleResult = computed(() => {
+  if (reportDetail.value?.result) return reportDetail.value.result
+  const content = String(message.value?.content || '')
+  const match = content.match(/处理说明[：:]\s*(.+)/)
+  return match ? match[1].trim() : '暂无处理说明'
+})
+const resultRecord = computed(() => appealDetail.value || reportDetail.value)
+const resultRelatedCard = computed(() => {
+  const record = resultRecord.value
+  if (!record?.targetType || !record?.targetId) return null
+  const key = { ORDER: 'order', PRODUCT: 'product', USER: 'user' }[record.targetType]
+  return buildRelatedCard({
+    targetType: record.targetType,
+    targetId: record.targetId,
+    ...(key && resultRelatedTarget.value ? { [key]: resultRelatedTarget.value } : {})
+  })
+})
 const hasRelatedTransactions = computed(() => {
   const content = String(message.value?.content || '')
   if (content.includes('商品') || content.includes('订单') || content.includes('交易')) return true
@@ -202,6 +337,8 @@ const relatedCard = computed(() => {
 onLoad(async (options) => {
   try {
     const data = await tradeService.getMessage(options.id)
+    await hydrateRelatedAppeal(data)
+    await hydrateRelatedReport(data)
     await hydrateRelatedProduct(data)
     message.value = data
     await tradeService.markMessageRead(options.id)
@@ -209,6 +346,71 @@ onLoad(async (options) => {
     showError(error)
   }
 })
+
+async function hydrateRelatedAppeal(item = {}) {
+  const targetType = item.targetType || item.relatedType
+  const targetId = item.targetId || item.relatedId
+  if (targetType !== 'APPEAL' || !targetId) return
+
+  try {
+    appealDetail.value = await tradeService.getAppeal(targetId)
+    await hydrateProcessedTarget(appealDetail.value)
+  } catch (error) {
+    appealDetail.value = null
+  }
+}
+
+async function hydrateRelatedReport(item = {}) {
+  const targetType = item.targetType || item.relatedType
+  const targetId = item.targetId || item.relatedId
+  if (targetType !== 'REPORT' || !targetId) return
+
+  try {
+    reportDetail.value = await tradeService.getReport(targetId)
+    await hydrateProcessedTarget(reportDetail.value)
+  } catch (error) {
+    reportDetail.value = null
+  }
+}
+
+async function hydrateProcessedTarget(record = {}) {
+  resultRelatedTarget.value = null
+  try {
+    if (record.targetType === 'ORDER') {
+      resultRelatedTarget.value = await tradeService.getOrder(record.targetId)
+    } else if (record.targetType === 'PRODUCT') {
+      try {
+        resultRelatedTarget.value = await getProductById(record.targetId)
+      } catch (error) {
+        const cached = uni.getStorageSync(`product-detail-cache-${record.targetId}`)
+        if (cached?.id || cached?.title || pickImage(cached)) {
+          resultRelatedTarget.value = cached
+          return
+        }
+        const historyItem = getBrowseHistory().find(
+          (entry) => String(entry.productId) === String(record.targetId)
+        )
+        if (historyItem) {
+          resultRelatedTarget.value = { ...historyItem, id: historyItem.productId }
+          return
+        }
+        const result = await listMyProducts()
+        const list = Array.isArray(result) ? result : (result?.items || result?.list || [])
+        resultRelatedTarget.value = list.find((entry) => String(entry.id) === String(record.targetId)) || null
+      }
+    } else if (record.targetType === 'USER') {
+      resultRelatedTarget.value = await getPublicProfile(record.targetId)
+    }
+  } catch (error) {
+    resultRelatedTarget.value = null
+  }
+}
+
+function formatProcessedTarget(record) {
+  if (!record) return '本次处理内容'
+  const label = { PRODUCT: '商品', USER: '用户', ORDER: '订单' }[record.targetType] || '相关内容'
+  return `${label}（ID：${record.targetId}）`
+}
 
 async function hydrateRelatedProduct(item = {}) {
   const targetType = item.targetType || item.relatedType
@@ -344,7 +546,7 @@ function hasConcreteRelated(item = {}) {
 function openRelated() {
   const related = relatedCard.value
   if (!related?.targetId) return
-  if (related.targetType === 'ORDER') navigate('/pages/order/detail', { id: related.targetId })
+  if (related.targetType === 'ORDER') navigate('/pages/order/detail', { id: related.targetId, fromMessage: 1 })
   else if (related.targetType === 'PRODUCT') navigate('/pages/detail/detail', { id: related.targetId })
   else if (related.targetType === 'USER') navigate('/pages/user-profile/user-profile', { id: related.targetId })
 }
@@ -361,6 +563,21 @@ function goAppeal() {
   navigate('/pages/interaction/appeal', { targetType: 'USER' })
 }
 
+function openResultRelated() {
+  const related = resultRelatedCard.value
+  if (!related?.targetId) return
+  if (related.targetType === 'ORDER') navigate('/pages/order/detail', { id: related.targetId, readonly: 1, fromMessage: 1 })
+  else if (related.targetType === 'PRODUCT') navigate('/pages/detail/detail', {
+    id: related.targetId,
+    readonly: 1,
+    snapshotTitle: resultRelatedTarget.value?.title || '',
+    snapshotPrice: resultRelatedTarget.value?.price || '',
+    snapshotImage: pickImage(resultRelatedTarget.value || {}),
+    snapshotMeetLocation: resultRelatedTarget.value?.meetLocation || ''
+  })
+  else if (related.targetType === 'USER') navigate('/pages/user-profile/user-profile', { id: related.targetId })
+}
+
 function goProductAppeal() {
   const targetId = message.value?.targetId
     || message.value?.relatedId
@@ -375,6 +592,7 @@ function goProductAppeal() {
 .loading-page { display: flex; align-items: center; justify-content: center; color: #667085; }
 .hero { padding: 34rpx 30rpx; border-radius: 28rpx; background: linear-gradient(135deg, #23734f, #3e9b72); color: #fff; box-shadow: 0 12rpx 32rpx rgba(35,115,79,.18); }
 .auth-hero { display: flex; min-height: 172rpx; align-items: center; justify-content: center; text-align: center; }
+.danger-hero { background: linear-gradient(135deg, #c9443e, #e0645d); box-shadow: 0 12rpx 32rpx rgba(180,48,43,.18); }
 .notice-hero { display: flex; min-height: 112rpx; align-items: center; justify-content: center; margin-bottom: 24rpx; text-align: center; }
 .auth-title { color: #fff; font-size: 42rpx; font-weight: 800; }
 .eyebrow, .hero-title, .hero-copy, .title, .time, .content, .related-label, .related-title, .related-meta { display: block; }
@@ -407,12 +625,16 @@ function goProductAppeal() {
 .result-label { flex-shrink: 0; color: #667085; font-size: 25rpx; }
 .result-value { color: #26342f; font-size: 26rpx; line-height: 1.6; text-align: right; }
 .actions { display: flex; gap: 18rpx; margin-top: 28rpx; }
+.message-center-actions { width: 100%; }
 .auth-actions { margin-top: 34rpx; }
 .account-status-content { margin-top: 34rpx; }
 .status-reason { padding: 30rpx; border-radius: 24rpx; background: #fff; box-shadow: 0 10rpx 30rpx rgba(28,68,52,.06); }
 .reason-label { display: block; color: #667085; font-size: 24rpx; margin-bottom: 12rpx; }
 .reason-value { display: block; color: #26342f; font-size: 30rpx; font-weight: 700; line-height: 1.5; }
 .reason-hint { display: block; margin-top: 16rpx; color: #89938f; font-size: 24rpx; }
+.appeal-result-row + .appeal-result-row { margin-top: 24rpx; padding-top: 24rpx; border-top: 1rpx solid #eef2f0; }
+.appeal-result-row .reason-label { margin-bottom: 10rpx; }
+.appeal-result-row .reason-value { font-size: 28rpx; font-weight: 600; }
 .transactions-hint { margin-top: 20rpx; padding: 20rpx 30rpx; }
 .hint-text { color: #89938f; font-size: 24rpx; line-height: 1.6; }
 .btn { flex: 1; height: 78rpx; line-height: 78rpx; border-radius: 999rpx; font-size: 26rpx; }
