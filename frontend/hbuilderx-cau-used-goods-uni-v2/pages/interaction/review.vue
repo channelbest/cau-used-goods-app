@@ -42,6 +42,7 @@ function saveSellerReview() {
     id: Date.now(),
     rating: form.rating,
     content: form.content,
+    anonymous: form.anonymous,
     productTitle: order.value?.product?.title || order.value?.productTitleSnapshot || '交易商品',
     createTime: new Date().toLocaleString()
   }].concat(Array.isArray(list) ? list : [])

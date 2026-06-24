@@ -13,6 +13,10 @@
             </view>
             <button v-if="!adminView && !isSelf" class="report-inline" :disabled="isCurrentUserRestricted" @click="reportUser">举报</button>
           </view>
+          <view class="rating-summary">
+            <text v-if="hasRating" class="rating-stars">{{ starText(roundedAverageRating) }}</text>
+            <text class="rating-text">{{ ratingSummaryText }}</text>
+          </view>
         </view>
       </view>
     </view>
@@ -36,16 +40,20 @@
     <view class="section">
       <view class="section-head">
         <text class="section-title">收到的评价</text>
-        <text class="section-subtitle">{{ reviews.length }} 条</text>
+        <text class="section-subtitle">{{ reviewCountText }}</text>
       </view>
       <view v-if="reviews.length" class="review-list">
         <view v-for="item in reviews" :key="item.id" class="review-card">
           <view class="review-head">
-            <text class="stars">{{ starText(item.rating) }}</text>
-            <text class="review-time">{{ item.createTime }}</text>
+            <view class="review-rating">
+              <text class="stars">{{ starText(item.rating) }}</text>
+              <text class="rating-number">{{ Number(item.rating || 0) }}分</text>
+            </view>
+            <text class="review-time">{{ formatReviewTime(item.createTime) }}</text>
           </view>
-          <text class="review-content">{{ item.content }}</text>
-          <text class="review-product">{{ item.productTitle }}</text>
+          <text class="reviewer">{{ reviewAuthorText(item) }}</text>
+          <text class="review-content">{{ item.content || '用户没有填写文字评价' }}</text>
+          <text class="review-product">商品：{{ item.productTitle || '交易商品' }}</text>
         </view>
       </view>
       <view v-else class="empty">暂无公开评价</view>
@@ -56,9 +64,8 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { getPublicProfile } from '../../api/user'
+import { getPublicHomepage, getPublicProfile, getSellerReviews } from '../../api/user'
 import { getAdminUserDetail } from '../../api/admin'
-import { listProducts } from '../../api/product'
 import { getUser } from '../../utils/auth'
 import { BASE_URL } from '../../utils/request'
 import { navigate, showError } from '../../utils/navigation'
@@ -68,6 +75,7 @@ const userId = ref('')
 const adminView = ref(false)
 const profile = ref(null)
 const adminUser = ref(null)
+const stats = ref({})
 const products = ref([])
 const reviews = ref([])
 
@@ -82,6 +90,15 @@ const currentUserRestrictionText = computed(() => {
 })
 const displayName = computed(() => profile.value?.nickname || 'CAU 同学')
 const avatarUrl = computed(() => normalizeImage(profile.value?.avatarUrl))
+const averageRating = computed(() => Number(stats.value?.averageRating || 0))
+const roundedAverageRating = computed(() => Math.round(averageRating.value))
+const reviewReceivedCount = computed(() => Number(stats.value?.reviewReceivedCount || 0))
+const hasRating = computed(() => reviewReceivedCount.value > 0 && averageRating.value > 0)
+const ratingSummaryText = computed(() => {
+  if (!hasRating.value) return '暂无评分'
+  return `${averageRating.value.toFixed(1)}分 · ${reviewReceivedCount.value}条评价`
+})
+const reviewCountText = computed(() => `${reviewReceivedCount.value || reviews.value.length} 条`)
 
 function normalizeImage(url) {
   if (!url) return ''
@@ -99,22 +116,57 @@ function formatPrice(value) {
   return Number.isInteger(number) ? String(number) : number.toFixed(2)
 }
 
+function padTime(value) {
+  return String(value).padStart(2, '0')
+}
+
+function formatReviewTime(value) {
+  if (!value) return ''
+  const raw = String(value)
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(raw)) return raw.slice(0, 16)
+  const date = new Date(raw)
+  if (Number.isNaN(date.getTime())) return raw.replace('T', ' ').replace(/\+\d{2}:\d{2}$/, '').slice(0, 16)
+  return `${date.getFullYear()}-${padTime(date.getMonth() + 1)}-${padTime(date.getDate())} ${padTime(date.getHours())}:${padTime(date.getMinutes())}`
+}
+
 function starText(value) {
-  const rating = Math.max(0, Math.min(5, Number(value || 0)))
+  const rating = Math.max(0, Math.min(5, Math.round(Number(value || 0))))
   return '★★★★★'.slice(0, rating) + '☆☆☆☆☆'.slice(0, 5 - rating)
 }
 
-async function loadProducts() {
-  const result = await listProducts({ page: 1, pageSize: 80 }).catch(() => ({ list: [], items: [] }))
-  const list = result.list || result.items || []
-  products.value = list
-    .filter((item) => String(item.sellerId || item.userId || item.ownerId) === String(userId.value))
-    .map((item) => ({ ...item, cover: pickCover(item) }))
+function reviewAuthorText(item) {
+  if (item.anonymous) return '匿名评价'
+  return item.reviewerNickname ? `评价人：${item.reviewerNickname}` : '匿名评价'
 }
 
-function loadLocalReviews() {
+async function loadHomepage() {
+  const homepage = await getPublicHomepage(userId.value, { page: 1, pageSize: 80 })
+  profile.value = homepage?.profile || profile.value
+  stats.value = homepage?.stats || {}
+  const list = homepage?.products?.items || homepage?.products?.list || []
+  products.value = list.map((item) => ({ ...item, cover: pickCover(item) }))
+}
+
+function localReviews() {
   const list = uni.getStorageSync(`user-reviews-${userId.value}`) || []
-  reviews.value = Array.isArray(list) ? list : []
+  return Array.isArray(list) ? list : []
+}
+
+async function loadReviews() {
+  const result = await getSellerReviews(userId.value, { page: 1, pageSize: 20 }).catch(() => null)
+  const list = result?.items || []
+  if (list.length) {
+    reviews.value = list
+    if (!stats.value?.reviewReceivedCount) {
+      stats.value = {
+        ...stats.value,
+        averageRating: result.avgRating,
+        reviewReceivedCount: result.reviewCount || result.total || list.length
+      }
+    }
+    return
+  }
+  reviews.value = localReviews()
 }
 
 function profileFromAdminUser(user) {
@@ -139,12 +191,14 @@ onLoad(async (options) => {
     if (adminView.value) {
       const detail = await getAdminUserDetail(userId.value).catch(() => null)
       adminUser.value = detail?.user || null
-      profile.value = await getPublicProfile(userId.value).catch(() => profileFromAdminUser(adminUser.value))
+      profile.value = profileFromAdminUser(adminUser.value)
+      await loadHomepage().catch(async () => {
+        profile.value = await getPublicProfile(userId.value).catch(() => profile.value)
+      })
     } else {
-      profile.value = await getPublicProfile(userId.value)
+      await loadHomepage()
     }
-    await loadProducts()
-    loadLocalReviews()
+    await loadReviews()
   } catch (error) {
     showError(error)
   }
@@ -185,6 +239,9 @@ function reportUser() {
 .tag.danger { background: #fff1ef; color: #d85c45; }
 .report-inline { flex-shrink: 0; height: 54rpx; margin: 0 0 0 auto; padding: 0 18rpx; border-radius: 999rpx; background: #fff1ef; color: #d85c45; font-size: 22rpx; line-height: 54rpx; }
 .report-inline::after { border: 0; }
+.rating-summary { display: flex; align-items: center; gap: 12rpx; margin-top: 16rpx; color: #7d8782; font-size: 24rpx; }
+.rating-stars { color: #f2a23a; font-size: 24rpx; letter-spacing: 1rpx; }
+.rating-text { color: #66736d; font-size: 24rpx; }
 .section { margin-top: 22rpx; padding: 26rpx; }
 .section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 20rpx; }
 .section-title { color: #202124; font-size: 31rpx; font-weight: 800; }
@@ -197,8 +254,11 @@ function reportUser() {
 .review-list { display: flex; flex-direction: column; gap: 16rpx; }
 .review-card { padding: 20rpx; border-radius: 20rpx; background: #f8faf9; }
 .review-head { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
+.review-rating { display: flex; min-width: 0; align-items: center; gap: 10rpx; }
 .stars { color: #f2a23a; font-size: 25rpx; letter-spacing: 2rpx; }
+.rating-number { color: #d78b25; font-size: 23rpx; font-weight: 700; }
 .review-time { color: #a0a6ad; font-size: 22rpx; }
+.reviewer { display: block; margin-top: 10rpx; color: #7d8782; font-size: 23rpx; }
 .review-content { display: block; margin-top: 12rpx; color: #26342f; font-size: 26rpx; line-height: 1.55; }
 .review-product { display: block; margin-top: 10rpx; color: #8a938e; font-size: 23rpx; }
 .empty { padding: 34rpx 0; color: #9aa2a8; font-size: 25rpx; text-align: center; }
