@@ -9,9 +9,11 @@
       <view class="name">{{ product.title || '商品' }}</view>
       <view class="price">￥{{ product.price || 0 }}</view>
       <view class="desc">商品ID：{{ product.id || '-' }}</view>
+      <view class="desc">卖家ID：{{ sellerId || '-' }}</view>
       <view class="desc">当前状态：{{ statusText(product.status) }}</view>
       <view class="desc">成色：{{ conditionText(product.conditionLevel) }}</view>
       <view class="desc">交易地点：{{ product.meetLocation || '线下面交' }}</view>
+      <button class="profile-button" :disabled="!sellerId" @click="goSellerProfile">查看用户主页</button>
     </view>
 
     <view class="actions">
@@ -32,6 +34,7 @@ const productId = ref('')
 const relatedType = ref('')
 const relatedId = ref(0)
 const mainImage = computed(() => normalizeImage(product.value?.images?.[0] || ''))
+const sellerId = computed(() => product.value?.sellerId || product.value?.seller_id || product.value?.seller?.id || '')
 
 onLoad((query = {}) => {
   productId.value = query.id || ''
@@ -82,6 +85,14 @@ const previewProductImage = () => {
   if (!urls.length) return
   uni.previewImage({ current: urls[0], urls })
 }
+
+const goSellerProfile = () => {
+  if (!sellerId.value) {
+    uni.showToast({ title: '暂无卖家信息', icon: 'none' })
+    return
+  }
+  uni.navigateTo({ url: `/pages/user-profile/user-profile?id=${sellerId.value}&adminView=1` })
+}
 </script>
 
 <style scoped>
@@ -93,6 +104,8 @@ const previewProductImage = () => {
 .name { font-size: 34rpx; font-weight: 700; color: #1f2933; }
 .price { margin-top: 18rpx; font-size: 40rpx; font-weight: 700; color: #e11d48; }
 .desc { margin-top: 12rpx; color: #667085; font-size: 26rpx; line-height: 1.6; }
+.profile-button { height: 72rpx; margin-top: 22rpx; border-radius: 12rpx; background: #23734f; color: #fff; font-size: 27rpx; line-height: 72rpx; }
+.profile-button[disabled] { background: #d0d5dd; color: #fff; }
 .actions { margin-top: 24rpx; }
 .pass, .reject { height: 88rpx; line-height: 88rpx; border-radius: 12rpx; font-size: 30rpx; }
 .pass { background: #17a84b; color: #fff; }
