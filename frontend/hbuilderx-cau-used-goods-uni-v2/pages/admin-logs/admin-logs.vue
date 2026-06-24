@@ -108,11 +108,17 @@ const operationMap = {
   PRODUCT_OFF_SHELF: '下架商品',
   PRODUCT_ON_SALE: '上架商品',
   REPORT_RESOLVE: '处理举报',
-  REPORT_APPROVE: '通过举报',
+   APPROVE_REPORT: '通过举报',
   REPORT_HANDLE: '处理举报',
+  MARK_REPORT_PROCESSING: '举报标记为处理中',
   REPORT_REJECT: '驳回举报',
+  REJECT_REPORT: '驳回举报',
   REPORT_CLOSE: '关闭举报',
   HANDLE_APPEAL: '处理申诉',
+  MARK_APPEAL_PROCESSING: '申诉标记为处理中',
+  APPROVE_APPEAL: '通过申诉',
+  REJECT_APPEAL: '驳回申诉',
+  REPORT_APPROVE: '通过举报',
   NOTICE_PUBLISH: '发布公告',
   NOTICE_OFFLINE: '下线公告',
   STATUS_NOTICE: '更新公告状态',
@@ -290,6 +296,13 @@ const operationLabel = (value, log = null) => {
 const translateOperation = (value) => {
   if (!value) return '操作'
   return String(value)
+    .replaceAll('PROCESSING', '处理中')
+    .replaceAll('APPROVED', '已通过')
+    .replaceAll('APPROVE', '通过')
+    .replaceAll('REJECTED', '已驳回')
+    .replaceAll('REJECT', '驳回')
+    .replaceAll('MARK', '标记')
+    .replaceAll('HANDLE', '处理')
     .replaceAll('STATUS', '更新状态')
     .replaceAll('CREATE', '新增')
     .replaceAll('UPDATE', '编辑')

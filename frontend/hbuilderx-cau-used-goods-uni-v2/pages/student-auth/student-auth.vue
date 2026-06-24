@@ -16,7 +16,6 @@
         <view class="info-row"><text>学院</text><text>{{ form.college || '-' }}</text></view>
         <view class="info-row"><text>当前状态</text><text class="pending-text">审核中</text></view>
       </view>
-      <button class="submit-button" @click="remindAdmin">催促管理员审核</button>
       <button class="secondary-button" @click="goHome">返回首页</button>
     </view>
 
@@ -117,13 +116,6 @@ const validateForm = () => {
 const goHome = () => {
   uni.switchTab({
     url: '/pages/home/home'
-  })
-}
-
-const remindAdmin = () => {
-  uni.showToast({
-    title: '已提醒管理员，请耐心等待',
-    icon: 'none'
   })
 }
 

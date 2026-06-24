@@ -102,6 +102,12 @@ export const getAdminUserReports = (userId, params = {}) => {
   return request({ url: `/admin/users/${userId}/reports?page=${page}&pageSize=${pageSize}` })
 }
 
+export const getAdminUserAppeals = (userId, params = {}) => {
+  const page = params.page || 1
+  const pageSize = params.pageSize || 5
+  return request({ url: `/admin/users/${userId}/appeals?page=${page}&pageSize=${pageSize}` })
+}
+
 export const getAdminProducts = (params = {}) => {
   const query = toQuery({ page: 1, pageSize: 50, sort: 'newest', ...params })
   return request({
