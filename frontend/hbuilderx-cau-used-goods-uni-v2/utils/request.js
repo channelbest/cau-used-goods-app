@@ -1,7 +1,7 @@
 import { getToken, clearAuth } from './auth'
 
-//export const BASE_URL = 'http://62.234.163.176:7001'
-export const BASE_URL = 'http://127.0.0.1:8080'
+export const BASE_URL = 'http://62.234.163.176:7001'
+// export const BASE_URL = 'http://127.0.0.1:8080'
 
 export const normalizeErrorMessage = (message, fallback = '请求失败，请稍后重试') => {
   const value = String(message || '').trim()
