@@ -501,7 +501,7 @@ func (h *Handler) UpdateProductStatus(c *gin.Context) {
 	}
 
 	if err := h.service.UpdateProductStatus(c.Request.Context(), productID, userID, req.Status, req.Reason); err != nil {
-		response.Error(c, http.StatusBadRequest, response.CodeBadRequest, "product not found or status cannot be changed")
+		response.Error(c, http.StatusBadRequest, response.CodeBadRequest, err.Error())
 		return
 	}
 

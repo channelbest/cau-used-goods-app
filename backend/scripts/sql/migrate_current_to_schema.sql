@@ -110,5 +110,12 @@ CALL `add_column_if_missing`(
   'content'
 );
 
+CALL `add_column_if_missing`(
+  'products',
+  'off_shelf_by',
+  'VARCHAR(20) NULL COMMENT ''下架来源：USER / ADMIN / SYSTEM''',
+  'off_shelf_reason'
+);
+
 DROP PROCEDURE IF EXISTS `add_index_if_missing`;
 DROP PROCEDURE IF EXISTS `add_column_if_missing`;

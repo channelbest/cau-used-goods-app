@@ -3,6 +3,7 @@ package product
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"unicode"
@@ -35,6 +36,7 @@ type Product struct {
 	ConditionLevel string   `json:"conditionLevel"`
 	MeetLocation   string   `json:"meetLocation"`
 	Status         string   `json:"status"`
+	OffShelfBy     *string  `json:"offShelfBy,omitempty"`
 	ViewCount      int      `json:"viewCount"`
 	FavoriteCount  int      `json:"favoriteCount"`
 	CreateTime     string   `json:"createTime"`
@@ -321,7 +323,7 @@ func (r *Repository) listProducts(ctx context.Context, input ListProductsInput) 
 
 	query := `
 		SELECT p.id, p.seller_id, p.category_id, p.title, p.description, p.original_price,
-		       p.price, p.condition_level, p.meet_location, p.status, p.view_count,
+		       p.price, p.condition_level, p.meet_location, p.status, p.off_shelf_by, p.view_count,
 		       p.favorite_count, DATE_FORMAT(p.create_time, '%Y-%m-%d %H:%i:%s')
 		FROM products p
 		LEFT JOIN categories c ON c.id = p.category_id
@@ -342,16 +344,18 @@ func (r *Repository) listProducts(ctx context.Context, input ListProductsInput) 
 		var originalPrice sql.NullFloat64
 		var condition sql.NullString
 		var location sql.NullString
+		var offShelfBy sql.NullString
 
 		if err := rows.Scan(
 			&p.ID, &p.SellerID, &p.CategoryID, &p.Title, &desc, &originalPrice,
-			&p.Price, &condition, &location, &p.Status, &p.ViewCount,
+			&p.Price, &condition, &location, &p.Status, &offShelfBy, &p.ViewCount,
 			&p.FavoriteCount, &p.CreateTime,
 		); err != nil {
 			return nil, err
 		}
 
 		fillProductNullableFields(&p, desc, originalPrice, condition, location)
+		fillProductOffShelfBy(&p, offShelfBy)
 
 		images, _ := r.ListProductImages(ctx, p.ID)
 		p.Images = images
@@ -449,10 +453,11 @@ func (r *Repository) GetProductByID(ctx context.Context, id uint64, viewer Produ
 	var originalPrice sql.NullFloat64
 	var condition sql.NullString
 	var location sql.NullString
+	var offShelfBy sql.NullString
 
 	err := r.db.QueryRowContext(ctx, `
 		SELECT id, seller_id, category_id, title, description, original_price,
-		       price, condition_level, meet_location, status, view_count,
+		       price, condition_level, meet_location, status, off_shelf_by, view_count,
 		       favorite_count, DATE_FORMAT(create_time, '%Y-%m-%d %H:%i:%s')
 		FROM products
 		WHERE id = ?
@@ -464,7 +469,7 @@ func (r *Repository) GetProductByID(ctx context.Context, id uint64, viewer Produ
 		  )
 	`, id, viewer.UserID, viewer.Role).Scan(
 		&p.ID, &p.SellerID, &p.CategoryID, &p.Title, &desc, &originalPrice,
-		&p.Price, &condition, &location, &p.Status, &p.ViewCount,
+		&p.Price, &condition, &location, &p.Status, &offShelfBy, &p.ViewCount,
 		&p.FavoriteCount, &p.CreateTime,
 	)
 	if err != nil {
@@ -472,6 +477,7 @@ func (r *Repository) GetProductByID(ctx context.Context, id uint64, viewer Produ
 	}
 
 	fillProductNullableFields(&p, desc, originalPrice, condition, location)
+	fillProductOffShelfBy(&p, offShelfBy)
 
 	images, err := r.ListProductImages(ctx, id)
 	if err != nil {
@@ -501,16 +507,17 @@ func (r *Repository) AdminGetProductByID(ctx context.Context, id uint64) (*Produ
 	var originalPrice sql.NullFloat64
 	var condition sql.NullString
 	var location sql.NullString
+	var offShelfBy sql.NullString
 
 	err := r.db.QueryRowContext(ctx, `
 		SELECT id, seller_id, category_id, title, description, original_price,
-		       price, condition_level, meet_location, status, view_count,
+		       price, condition_level, meet_location, status, off_shelf_by, view_count,
 		       favorite_count, DATE_FORMAT(create_time, '%Y-%m-%d %H:%i:%s')
 		FROM products
 		WHERE id = ?
 	`, id).Scan(
 		&p.ID, &p.SellerID, &p.CategoryID, &p.Title, &desc, &originalPrice,
-		&p.Price, &condition, &location, &p.Status, &p.ViewCount,
+		&p.Price, &condition, &location, &p.Status, &offShelfBy, &p.ViewCount,
 		&p.FavoriteCount, &p.CreateTime,
 	)
 	if err != nil {
@@ -518,6 +525,7 @@ func (r *Repository) AdminGetProductByID(ctx context.Context, id uint64) (*Produ
 	}
 
 	fillProductNullableFields(&p, desc, originalPrice, condition, location)
+	fillProductOffShelfBy(&p, offShelfBy)
 
 	images, err := r.ListProductImages(ctx, id)
 	if err != nil {
@@ -555,7 +563,7 @@ func (r *Repository) ListProductImages(ctx context.Context, productID uint64) ([
 func (r *Repository) ListMyProducts(ctx context.Context, sellerID uint64) ([]Product, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id, seller_id, category_id, title, description, original_price,
-		       price, condition_level, meet_location, status, view_count,
+		       price, condition_level, meet_location, status, off_shelf_by, view_count,
 		       favorite_count, DATE_FORMAT(create_time, '%Y-%m-%d %H:%i:%s')
 		FROM products
 		WHERE seller_id = ? AND is_deleted = 0
@@ -573,16 +581,18 @@ func (r *Repository) ListMyProducts(ctx context.Context, sellerID uint64) ([]Pro
 		var originalPrice sql.NullFloat64
 		var condition sql.NullString
 		var location sql.NullString
+		var offShelfBy sql.NullString
 
 		if err := rows.Scan(
 			&p.ID, &p.SellerID, &p.CategoryID, &p.Title, &desc, &originalPrice,
-			&p.Price, &condition, &location, &p.Status, &p.ViewCount,
+			&p.Price, &condition, &location, &p.Status, &offShelfBy, &p.ViewCount,
 			&p.FavoriteCount, &p.CreateTime,
 		); err != nil {
 			return nil, err
 		}
 
 		fillProductNullableFields(&p, desc, originalPrice, condition, location)
+		fillProductOffShelfBy(&p, offShelfBy)
 
 		images, _ := r.ListProductImages(ctx, p.ID)
 		p.Images = images
@@ -660,7 +670,8 @@ func (r *Repository) UpdateProductStatus(ctx context.Context, productID uint64, 
 	result, err := r.db.ExecContext(ctx, `
 		UPDATE products
 		SET status = ?,
-		    off_shelf_reason = ?,
+		    off_shelf_reason = CASE WHEN ? = 'OFF_SHELF' THEN ? ELSE NULL END,
+		    off_shelf_by = CASE WHEN ? = 'OFF_SHELF' THEN 'USER' ELSE NULL END,
 		    update_time = CURRENT_TIMESTAMP
 		WHERE id = ?
 		  AND seller_id = ?
@@ -668,16 +679,37 @@ func (r *Repository) UpdateProductStatus(ctx context.Context, productID uint64, 
 		  AND (
 		      (? = 'OFF_SHELF' AND status = 'ON_SALE')
 		      OR
-		      (? = 'ON_SALE' AND status = 'OFF_SHELF')
+		      (? = 'ON_SALE' AND status = 'OFF_SHELF' AND off_shelf_by = 'USER')
 		  )
 	`,
-		status, reason, productID, sellerID, status, status,
+		status, status, reason, status, productID, sellerID, status, status,
 	)
 	if err != nil {
 		return err
 	}
 
-	return checkAffected(result)
+	if err := checkAffected(result); err != nil {
+		if errors.Is(err, sql.ErrNoRows) && status == "ON_SALE" {
+			var offShelfBy sql.NullString
+			checkErr := r.db.QueryRowContext(ctx, `
+				SELECT off_shelf_by
+				FROM products
+				WHERE id = ?
+				  AND seller_id = ?
+				  AND is_deleted = 0
+				  AND status = 'OFF_SHELF'
+				LIMIT 1
+			`, productID, sellerID).Scan(&offShelfBy)
+			if checkErr == nil && offShelfBy.Valid && offShelfBy.String == "ADMIN" {
+				return fmt.Errorf("管理员下架的商品不能自行上架")
+			}
+			if checkErr == nil && offShelfBy.Valid && offShelfBy.String == "SYSTEM" {
+				return fmt.Errorf("系统下架的商品不能自行上架")
+			}
+		}
+		return err
+	}
+	return nil
 }
 
 func (r *Repository) AdminUpdateProductStatus(ctx context.Context, input AdminUpdateProductStatusInput) error {
@@ -697,10 +729,11 @@ func (r *Repository) AdminUpdateProductStatusTx(ctx context.Context, tx *sql.Tx,
 		UPDATE products
 		SET status = ?,
 		    off_shelf_reason = CASE WHEN ? = 'OFF_SHELF' THEN ? ELSE NULL END,
+		    off_shelf_by = CASE WHEN ? = 'OFF_SHELF' THEN 'ADMIN' ELSE NULL END,
 		    is_deleted = ?,
 		    update_time = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, input.Status, input.Status, input.Reason, isDeleted, input.ProductID)
+	`, input.Status, input.Status, input.Reason, input.Status, isDeleted, input.ProductID)
 	if err != nil {
 		return fmt.Errorf("update product status: %w", err)
 	}
@@ -752,6 +785,7 @@ func (r *Repository) OffShelfOnSaleBySellerTx(ctx context.Context, tx *sql.Tx, s
 		UPDATE products
 		SET status = 'OFF_SHELF',
 		    off_shelf_reason = ?,
+		    off_shelf_by = 'SYSTEM',
 		    update_time = CURRENT_TIMESTAMP
 		WHERE seller_id = ?
 		  AND is_deleted = 0
@@ -953,6 +987,8 @@ func (r *Repository) LockProduct(ctx context.Context, productID uint64) error {
 	result, err := r.db.ExecContext(ctx, `
 		UPDATE products
 		SET status = 'LOCKED',
+		    off_shelf_reason = NULL,
+		    off_shelf_by = NULL,
 		    update_time = CURRENT_TIMESTAMP
 		WHERE id = ?
 		  AND is_deleted = 0
@@ -977,6 +1013,8 @@ func (r *Repository) UnlockProduct(ctx context.Context, productID uint64) error 
 	result, err := r.db.ExecContext(ctx, `
 		UPDATE products
 		SET status = 'ON_SALE',
+		    off_shelf_reason = NULL,
+		    off_shelf_by = NULL,
 		    update_time = CURRENT_TIMESTAMP
 		WHERE id = ?
 		  AND is_deleted = 0
@@ -1001,6 +1039,8 @@ func (r *Repository) MarkProductSold(ctx context.Context, productID uint64) erro
 	result, err := r.db.ExecContext(ctx, `
 		UPDATE products
 		SET status = 'SOLD',
+		    off_shelf_reason = NULL,
+		    off_shelf_by = NULL,
 		    update_time = CURRENT_TIMESTAMP
 		WHERE id = ?
 		  AND is_deleted = 0
@@ -1032,6 +1072,12 @@ func fillProductNullableFields(p *Product, desc sql.NullString, originalPrice sq
 	}
 	if location.Valid {
 		p.MeetLocation = location.String
+	}
+}
+
+func fillProductOffShelfBy(p *Product, offShelfBy sql.NullString) {
+	if offShelfBy.Valid {
+		p.OffShelfBy = &offShelfBy.String
 	}
 }
 

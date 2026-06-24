@@ -405,7 +405,7 @@ func (r *Repository) applyApprovedAction(ctx context.Context, tx *sql.Tx, item *
 	case TargetTypeProduct:
 		_, err := tx.ExecContext(ctx, `
 			UPDATE products
-			SET status = 'ON_SALE', off_shelf_reason = NULL, update_time = CURRENT_TIMESTAMP
+			SET status = 'ON_SALE', off_shelf_reason = NULL, off_shelf_by = NULL, update_time = CURRENT_TIMESTAMP
 			WHERE id = ? AND is_deleted = 0 AND status = 'OFF_SHELF'
 		`, item.TargetID)
 		if err != nil {
