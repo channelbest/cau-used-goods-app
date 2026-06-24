@@ -10,6 +10,7 @@
             <view class="tags">
               <text class="tag">{{ profile.authStatus === 'VERIFIED' ? '学生已认证' : '学生未认证' }}</text>
               <text class="tag" :class="{ danger: !profile.tradeAvailable }">{{ profile.tradeAvailable ? '交易正常' : '交易受限' }}</text>
+              <text v-if="showAdminUserId" class="tag muted">ID：{{ userId }}</text>
             </view>
             <button v-if="!adminView && !isSelf" class="report-inline" :disabled="isCurrentUserRestricted" @click="reportUser">举报</button>
           </view>
@@ -18,6 +19,12 @@
             <text class="rating-text">{{ ratingSummaryText }}</text>
           </view>
         </view>
+      </view>
+      <view v-if="hasRiskAdminActions" class="admin-actions">
+        <button v-if="canDisableTarget" class="admin-action warn" @click="changeTargetStatus('DISABLED')">禁用</button>
+        <button v-if="canBanTarget" class="admin-action danger" @click="changeTargetStatus('BANNED')">封禁</button>
+        <button v-if="canRestoreTarget" class="admin-action ok" @click="changeTargetStatus('NORMAL')">恢复</button>
+        <button v-if="canUnbanTarget" class="admin-action ok" @click="changeTargetStatus('NORMAL')">解封</button>
       </view>
     </view>
 
@@ -65,7 +72,7 @@
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getPublicHomepage, getPublicProfile, getSellerReviews } from '../../api/user'
-import { getAdminUserDetail } from '../../api/admin'
+import { getAdminUserDetail, updateAdminUserStatus } from '../../api/admin'
 import { getUser } from '../../utils/auth'
 import { BASE_URL } from '../../utils/request'
 import { navigate, showError } from '../../utils/navigation'
@@ -73,6 +80,9 @@ import { accountStatusOf, isBannedUserStatus, isDisabledUserStatus } from '../..
 
 const userId = ref('')
 const adminView = ref(false)
+const hideAdminActions = ref(false)
+const relatedType = ref('')
+const relatedId = ref('')
 const profile = ref(null)
 const adminUser = ref(null)
 const stats = ref({})
@@ -81,6 +91,14 @@ const reviews = ref([])
 
 const currentUserId = computed(() => getUser()?.id || getUser()?.userId || '')
 const isSelf = computed(() => String(userId.value) === String(currentUserId.value))
+const currentUserRole = computed(() => {
+  const devRole = String(uni.getStorageSync('dev-login-role') || '').toUpperCase()
+  if (devRole) return devRole
+  const user = getUser() || {}
+  return String(user.role || user.userRole || user.user_role || '').toUpperCase()
+})
+const isAdminRole = computed(() => currentUserRole.value === 'ADMIN' || currentUserRole.value === 'SUPER_ADMIN')
+const isSuperAdmin = computed(() => currentUserRole.value === 'SUPER_ADMIN')
 const currentUserAccountStatus = computed(() => accountStatusOf(getUser() || {}))
 const isCurrentUserRestricted = computed(() => isBannedUserStatus(currentUserAccountStatus.value) || isDisabledUserStatus(currentUserAccountStatus.value))
 const currentUserRestrictionText = computed(() => {
@@ -90,6 +108,14 @@ const currentUserRestrictionText = computed(() => {
 })
 const displayName = computed(() => profile.value?.nickname || 'CAU 同学')
 const avatarUrl = computed(() => normalizeImage(profile.value?.avatarUrl))
+const targetAccountStatus = computed(() => String(accountStatusOf(adminUser.value || profile.value || {})).toUpperCase())
+const showRiskAdminActions = computed(() => adminView.value && !hideAdminActions.value && isAdminRole.value && !isSelf.value)
+const showAdminUserId = computed(() => adminView.value && !hideAdminActions.value)
+const canDisableTarget = computed(() => showRiskAdminActions.value && targetAccountStatus.value === 'NORMAL')
+const canBanTarget = computed(() => showRiskAdminActions.value && (targetAccountStatus.value === 'NORMAL' || targetAccountStatus.value === 'DISABLED'))
+const canRestoreTarget = computed(() => showRiskAdminActions.value && targetAccountStatus.value === 'DISABLED')
+const canUnbanTarget = computed(() => showRiskAdminActions.value && targetAccountStatus.value === 'BANNED' && isSuperAdmin.value)
+const hasRiskAdminActions = computed(() => canDisableTarget.value || canBanTarget.value || canRestoreTarget.value || canUnbanTarget.value)
 const averageRating = computed(() => Number(stats.value?.averageRating || 0))
 const roundedAverageRating = computed(() => Math.round(averageRating.value))
 const reviewReceivedCount = computed(() => Number(stats.value?.reviewReceivedCount || 0))
@@ -176,6 +202,7 @@ function profileFromAdminUser(user) {
     nickname: user.nickname,
     avatarUrl: user.avatarUrl,
     authStatus: user.authStatus,
+    accountStatus: user.accountStatus,
     tradeAvailable: user.accountStatus === 'NORMAL'
   }
 }
@@ -183,6 +210,9 @@ function profileFromAdminUser(user) {
 onLoad(async (options) => {
   userId.value = options.id || ''
   adminView.value = options.adminView === '1' || options.adminView === 1
+  hideAdminActions.value = options.hideAdminActions === '1' || options.hideAdminActions === 1
+  relatedType.value = String(options.relatedType || '').toUpperCase()
+  relatedId.value = options.relatedId || ''
   if (!userId.value) {
     showError(new Error('用户不存在'))
     return
@@ -206,7 +236,11 @@ onLoad(async (options) => {
 
 function openProduct(id) {
   if (!id) return
-  navigate('/pages/detail/detail', { id })
+  navigate('/pages/detail/detail', {
+    id,
+    adminView: adminView.value ? 1 : '',
+    readonly: adminView.value ? 1 : ''
+  })
 }
 
 function reportUser() {
@@ -219,6 +253,63 @@ function reportUser() {
     return
   }
   navigate('/pages/interaction/report', { targetType: 'USER', targetId: userId.value })
+}
+
+function accountText(status) {
+  return { NORMAL: '恢复', DISABLED: '禁用', BANNED: '封禁' }[status] || status || '处理'
+}
+
+function syncTargetStatus(status) {
+  if (adminUser.value) {
+    adminUser.value = { ...adminUser.value, accountStatus: status }
+  }
+  if (profile.value) {
+    profile.value = {
+      ...profile.value,
+      accountStatus: status,
+      tradeAvailable: status === 'NORMAL'
+    }
+  }
+}
+
+function relatedPayload() {
+  const type = String(relatedType.value || '').toUpperCase()
+  const id = Number(relatedId.value || 0)
+  if (!['REPORT', 'APPEAL'].includes(type) || !Number.isFinite(id) || id <= 0) return {}
+  return { relatedType: type, relatedId: id }
+}
+
+function changeTargetStatus(status) {
+  if (!showRiskAdminActions.value) return
+  if (status === 'NORMAL' && targetAccountStatus.value === 'BANNED' && !isSuperAdmin.value) {
+    uni.showToast({ title: '只有超级管理员可以解封用户', icon: 'none' })
+    return
+  }
+  const actionText = targetAccountStatus.value === 'BANNED' && status === 'NORMAL' ? '解封' : accountText(status)
+  uni.showModal({
+    title: `${actionText}用户`,
+    editable: true,
+    placeholderText: '请输入处理原因',
+    success: async (res) => {
+      if (!res.confirm) return
+      const reason = String(res.content || '').trim()
+      if (!reason) {
+        uni.showToast({ title: '请填写处理原因', icon: 'none' })
+        return
+      }
+      try {
+        await updateAdminUserStatus(userId.value, {
+          accountStatus: status,
+          reason,
+          ...relatedPayload()
+        })
+        syncTargetStatus(status)
+        uni.showToast({ title: '操作成功', icon: 'success' })
+      } catch (error) {
+        uni.showToast({ title: error.message || '操作失败', icon: 'none' })
+      }
+    }
+  })
 }
 
 </script>
@@ -239,6 +330,12 @@ function reportUser() {
 .tag.danger { background: #fff1ef; color: #d85c45; }
 .report-inline { flex-shrink: 0; height: 54rpx; margin: 0 0 0 auto; padding: 0 18rpx; border-radius: 999rpx; background: #fff1ef; color: #d85c45; font-size: 22rpx; line-height: 54rpx; }
 .report-inline::after { border: 0; }
+.admin-actions { display: flex; flex-wrap: wrap; gap: 14rpx; margin-top: 28rpx; }
+.admin-action { flex: 1; min-width: 150rpx; height: 66rpx; margin: 0; border-radius: 14rpx; font-size: 25rpx; line-height: 66rpx; }
+.admin-action.warn { background: #fff7e6; color: #b66a00; }
+.admin-action.danger { background: #fff1f0; color: #cf1322; }
+.admin-action.ok { background: #e7f6ee; color: #207f55; }
+.admin-action::after { border: 0; }
 .rating-summary { display: flex; align-items: center; gap: 12rpx; margin-top: 16rpx; color: #7d8782; font-size: 24rpx; }
 .rating-stars { color: #f2a23a; font-size: 24rpx; letter-spacing: 1rpx; }
 .rating-text { color: #66736d; font-size: 24rpx; }

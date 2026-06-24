@@ -325,7 +325,7 @@ func (s *Service) AdminUpdateProductStatus(ctx context.Context, input AdminUpdat
 		input.IPAddress = &trimmed
 	}
 	if !isValidAdminProductStatus(input.Status) {
-		return fmt.Errorf("status must be ON_SALE, OFF_SHELF, LOCKED, SOLD or DELETED")
+		return fmt.Errorf("status must be ON_SALE, OFF_SHELF, LOCKED or DELETED")
 	}
 	if len([]rune(input.Reason)) > 500 {
 		return fmt.Errorf("reason cannot exceed 500 characters")
@@ -406,6 +406,15 @@ func (s *Service) logAdminActionTx(ctx context.Context, tx *sql.Tx, adminID uint
 }
 
 func isValidAdminProductStatus(status string) bool {
+	switch status {
+	case "ON_SALE", "OFF_SHELF", "LOCKED", "DELETED":
+		return true
+	default:
+		return false
+	}
+}
+
+func isValidAdminProductListStatus(status string) bool {
 	switch status {
 	case "ON_SALE", "OFF_SHELF", "LOCKED", "SOLD", "DELETED":
 		return true

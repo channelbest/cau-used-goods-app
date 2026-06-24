@@ -31,7 +31,8 @@ import { onLoad } from '@dcloudio/uni-app'
 import { getUser, setUser } from '../../utils/auth'
 import { updateProfile, uploadAvatar } from '../../api/auth'
 
-const BASE_URL = 'http://62.234.163.176:7001'
+//const BASE_URL = 'http://62.234.163.176:7001'
+const BASE_URL = 'http://127.0.0.1:8080'
 const nickname = ref('')
 const phone = ref('')
 const avatarUrl = ref('')

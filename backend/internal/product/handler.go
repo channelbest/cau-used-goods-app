@@ -304,7 +304,7 @@ func (h *Handler) AdminListProducts(c *gin.Context) {
 		}
 	}
 
-	if status != "" && !isValidAdminProductStatus(status) {
+	if status != "" && !isValidAdminProductListStatus(status) {
 		response.Error(c, http.StatusBadRequest, response.CodeBadRequest, "invalid status")
 		return
 	}

@@ -243,11 +243,11 @@ function reportReasonText(reasonType) {
 }
 
 function openUserHome(item) {
-  uni.navigateTo({ url: `/pages/user-profile/user-profile?id=${item.id}&adminView=1` })
+  uni.navigateTo({ url: `/pages/user-profile/user-profile?id=${item.id}&adminView=1&hideAdminActions=1` })
 }
 
 function openProduct(item) {
-  uni.navigateTo({ url: `/pages/detail/detail?id=${item.id}` })
+  uni.navigateTo({ url: `/pages/detail/detail?id=${item.id}&adminView=1&readonly=1` })
 }
 
 async function toggleRelated(item) {

@@ -28,6 +28,7 @@ type Category struct {
 type Product struct {
 	ID             uint64   `json:"id"`
 	SellerID       uint64   `json:"sellerId"`
+	BuyerID        *uint64  `json:"buyerId,omitempty"`
 	CategoryID     uint64   `json:"categoryId"`
 	Title          string   `json:"title"`
 	Description    string   `json:"description"`
@@ -508,15 +509,30 @@ func (r *Repository) AdminGetProductByID(ctx context.Context, id uint64) (*Produ
 	var condition sql.NullString
 	var location sql.NullString
 	var offShelfBy sql.NullString
+	var buyerID sql.NullInt64
 
 	err := r.db.QueryRowContext(ctx, `
-		SELECT id, seller_id, category_id, title, description, original_price,
-		       price, condition_level, meet_location, status, off_shelf_by, view_count,
-		       favorite_count, DATE_FORMAT(create_time, '%Y-%m-%d %H:%i:%s')
-		FROM products
-		WHERE id = ?
+		SELECT p.id, p.seller_id,
+		       (
+		           SELECT o.buyer_id
+		           FROM orders o
+		           WHERE o.product_id = p.id
+		             AND o.status IN ('PENDING_CONFIRM', 'WAIT_MEET', 'COMPLETED')
+		           ORDER BY CASE o.status
+		               WHEN 'WAIT_MEET' THEN 1
+		               WHEN 'PENDING_CONFIRM' THEN 2
+		               WHEN 'COMPLETED' THEN 3
+		               ELSE 4
+		           END, o.update_time DESC
+		           LIMIT 1
+		       ) AS buyer_id,
+		       p.category_id, p.title, p.description, p.original_price,
+		       p.price, p.condition_level, p.meet_location, p.status, p.off_shelf_by, p.view_count,
+		       p.favorite_count, DATE_FORMAT(p.create_time, '%Y-%m-%d %H:%i:%s')
+		FROM products p
+		WHERE p.id = ?
 	`, id).Scan(
-		&p.ID, &p.SellerID, &p.CategoryID, &p.Title, &desc, &originalPrice,
+		&p.ID, &p.SellerID, &buyerID, &p.CategoryID, &p.Title, &desc, &originalPrice,
 		&p.Price, &condition, &location, &p.Status, &offShelfBy, &p.ViewCount,
 		&p.FavoriteCount, &p.CreateTime,
 	)
@@ -526,6 +542,7 @@ func (r *Repository) AdminGetProductByID(ctx context.Context, id uint64) (*Produ
 
 	fillProductNullableFields(&p, desc, originalPrice, condition, location)
 	fillProductOffShelfBy(&p, offShelfBy)
+	fillProductBuyerID(&p, buyerID)
 
 	images, err := r.ListProductImages(ctx, id)
 	if err != nil {
@@ -1078,6 +1095,13 @@ func fillProductNullableFields(p *Product, desc sql.NullString, originalPrice sq
 func fillProductOffShelfBy(p *Product, offShelfBy sql.NullString) {
 	if offShelfBy.Valid {
 		p.OffShelfBy = &offShelfBy.String
+	}
+}
+
+func fillProductBuyerID(p *Product, buyerID sql.NullInt64) {
+	if buyerID.Valid {
+		value := uint64(buyerID.Int64)
+		p.BuyerID = &value
 	}
 }
 

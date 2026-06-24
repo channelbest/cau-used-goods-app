@@ -356,7 +356,7 @@ const productStatusText = (status) => {
 
 const goProduct = (id) => {
   if (!id) return
-  uni.navigateTo({ url: `/pages/admin-product-status/admin-product-status?id=${id}` })
+  uni.navigateTo({ url: `/pages/detail/detail?id=${id}&adminView=1&readonly=1` })
 }
 
 const actorName = (item) => {

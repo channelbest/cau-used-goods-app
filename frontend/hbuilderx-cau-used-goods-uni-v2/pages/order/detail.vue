@@ -43,14 +43,6 @@
       </view>
     </view>
 
-    <view v-if="false && adminView" class="notice">
-      管理员只读查看订单，如需异常关闭请在风险处理入口继续操作。
-    </view>
-
-    <view v-if="adminView" class="notice">
-      管理员只读查看订单，可对待确认或待面交订单执行异常关闭。
-    </view>
-
     <view v-if="adminView" class="actions admin-actions">
       <button v-if="canAdminExceptionClose" class="btn btn-danger" :loading="submitting" @click="openCloseModal">异常关闭</button>
       <button v-else class="btn btn-disabled" disabled>{{ status.label || '不可操作' }}</button>
@@ -296,6 +288,8 @@ function openSeller() {
   navigate('/pages/user-profile/user-profile', {
     id: sellerId.value,
     adminView: adminView.value ? 1 : '',
+    relatedType: relatedType.value,
+    relatedId: relatedId.value,
     productId,
     productTitle: order.value?.product?.title || order.value?.productTitleSnapshot || ''
   })
