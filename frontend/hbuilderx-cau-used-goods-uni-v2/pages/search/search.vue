@@ -98,6 +98,18 @@ const filters = reactive({
 const products = computed(() => rawProducts.value.map((item) => formatProduct(item, buildCategoryMap(categories.value))))
 const finished = computed(() => rawProducts.value.length >= total.value && total.value > 0)
 const currentSortLabel = computed(() => sortOptions.find((item) => item.value === filters.sort)?.label || '最新发布')
+const parentIdOf = (item) => Number(item.parentId || item.parent_id || 0)
+
+const selectedCategoryIds = computed(() => {
+  const categoryId = Number(filters.categoryId || 0)
+  if (!categoryId) return []
+
+  const children = categories.value
+    .filter((item) => parentIdOf(item) === categoryId && Number(item.id) !== categoryId)
+    .map((item) => item.id)
+
+  return [categoryId, ...children]
+})
 
 const loadProducts = async (reset = false) => {
   if (loading.value || (!reset && finished.value)) return
@@ -105,15 +117,30 @@ const loadProducts = async (reset = false) => {
   loading.value = true
   try {
     const nextPage = reset ? 1 : page.value
-    const result = await listProducts({
+    const baseParams = {
       ...filters,
+      categoryId: undefined,
       page: nextPage,
       pageSize: 8
-    })
+    }
 
-    const list = result.list || []
-    rawProducts.value = reset ? list : rawProducts.value.concat(list)
-    total.value = result.total || 0
+    const requests = selectedCategoryIds.value.length
+      ? selectedCategoryIds.value.map((categoryId) => listProducts({ ...baseParams, categoryId }))
+      : [listProducts(baseParams)]
+    const results = await Promise.all(requests)
+
+    const merged = []
+    const seen = {}
+    results.forEach((result) => {
+      ;(result.list || []).forEach((item) => {
+        if (seen[item.id]) return
+        seen[item.id] = true
+        merged.push(item)
+      })
+    })
+    merged.sort((a, b) => String(b.createTime || '').localeCompare(String(a.createTime || '')))
+    rawProducts.value = reset ? merged : rawProducts.value.concat(merged)
+    total.value = results.reduce((sum, result) => sum + Number(result.total || 0), 0)
     page.value = nextPage + 1
   } catch (error) {
     uni.showToast({ title: error.message || '搜索失败', icon: 'none' })

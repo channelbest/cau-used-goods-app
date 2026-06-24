@@ -1,8 +1,8 @@
 import { request } from '../utils/request'
 import { getToken } from '../utils/auth'
 
-//const BASE_URL = 'http://62.234.163.176:7001'
-const BASE_URL = 'http://127.0.0.1:8080'
+const BASE_URL = 'http://62.234.163.176:7001'
+// const BASE_URL = 'http://127.0.0.1:8080'
 
 export const devLogin = (payload = {}) => {
   return request({
