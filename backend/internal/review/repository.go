@@ -16,10 +16,10 @@ func NewRepository(db *sql.DB) *Repository {
 
 func (r *Repository) Create(ctx context.Context, review *Review) error {
 	query := `
-		INSERT INTO reviews (order_id, product_id, reviewer_id, seller_id, rating, content)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO reviews (order_id, product_id, reviewer_id, seller_id, rating, content, is_anonymous)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
-	result, err := r.db.ExecContext(ctx, query, review.OrderID, review.ProductID, review.ReviewerID, review.SellerID, review.Rating, review.Content)
+	result, err := r.db.ExecContext(ctx, query, review.OrderID, review.ProductID, review.ReviewerID, review.SellerID, review.Rating, review.Content, review.Anonymous)
 	if err != nil {
 		return fmt.Errorf("insert review: %w", err)
 	}
@@ -33,7 +33,7 @@ func (r *Repository) Create(ctx context.Context, review *Review) error {
 
 func (r *Repository) GetByOrderAndReviewer(ctx context.Context, orderID, reviewerID uint64) (*Review, error) {
 	query := `
-		SELECT id, order_id, product_id, reviewer_id, seller_id, rating, content, status, create_time, is_deleted
+		SELECT id, order_id, product_id, reviewer_id, seller_id, rating, content, is_anonymous, status, create_time, is_deleted
 		FROM reviews WHERE order_id = ? AND reviewer_id = ? AND is_deleted = 0
 	`
 	row := r.db.QueryRowContext(ctx, query, orderID, reviewerID)
@@ -42,7 +42,7 @@ func (r *Repository) GetByOrderAndReviewer(ctx context.Context, orderID, reviewe
 
 func (r *Repository) GetByID(ctx context.Context, id uint64) (*Review, error) {
 	query := `
-		SELECT id, order_id, product_id, reviewer_id, seller_id, rating, content, status, create_time, is_deleted
+		SELECT id, order_id, product_id, reviewer_id, seller_id, rating, content, is_anonymous, status, create_time, is_deleted
 		FROM reviews WHERE id = ? AND is_deleted = 0
 	`
 	row := r.db.QueryRowContext(ctx, query, id)
@@ -57,7 +57,7 @@ func (r *Repository) ListByProduct(ctx context.Context, productID uint64, page, 
 	}
 
 	query := `
-		SELECT r.id, r.order_id, r.product_id, r.reviewer_id, r.seller_id, r.rating, r.content, r.status, r.create_time,
+		SELECT r.id, r.order_id, r.product_id, r.reviewer_id, r.seller_id, r.rating, r.content, r.is_anonymous, r.status, r.create_time,
 			u.nickname, p.title, pi.image_url
 		FROM reviews r
 		LEFT JOIN users u ON u.id = r.reviewer_id
@@ -78,14 +78,17 @@ func (r *Repository) ListByProduct(ctx context.Context, productID uint64, page, 
 		var rd ReviewDetail
 		var nick, title, img sql.NullString
 		err := rows.Scan(
-			&rd.ID, &rd.OrderID, &rd.ProductID, &rd.ReviewerID, &rd.SellerID, &rd.Rating, &rd.Content, &rd.Status, &rd.CreateTime,
+			&rd.ID, &rd.OrderID, &rd.ProductID, &rd.ReviewerID, &rd.SellerID, &rd.Rating, &rd.Content, &rd.Anonymous, &rd.Status, &rd.CreateTime,
 			&nick, &title, &img,
 		)
 		if err != nil {
 			return nil, 0, fmt.Errorf("scan review: %w", err)
 		}
-		if nick.Valid {
+		if nick.Valid && !rd.Anonymous {
 			rd.ReviewerNickname = &nick.String
+		}
+		if rd.Anonymous {
+			rd.ReviewerID = 0
 		}
 		rd.ProductTitle = title.String
 		if img.Valid {
@@ -104,7 +107,7 @@ func (r *Repository) ListBySeller(ctx context.Context, sellerID uint64, page, pa
 	}
 
 	query := `
-		SELECT r.id, r.order_id, r.product_id, r.reviewer_id, r.seller_id, r.rating, r.content, r.status, r.create_time,
+		SELECT r.id, r.order_id, r.product_id, r.reviewer_id, r.seller_id, r.rating, r.content, r.is_anonymous, r.status, r.create_time,
 			u.nickname, p.title, pi.image_url
 		FROM reviews r
 		LEFT JOIN users u ON u.id = r.reviewer_id
@@ -125,14 +128,17 @@ func (r *Repository) ListBySeller(ctx context.Context, sellerID uint64, page, pa
 		var rd ReviewDetail
 		var nick, title, img sql.NullString
 		err := rows.Scan(
-			&rd.ID, &rd.OrderID, &rd.ProductID, &rd.ReviewerID, &rd.SellerID, &rd.Rating, &rd.Content, &rd.Status, &rd.CreateTime,
+			&rd.ID, &rd.OrderID, &rd.ProductID, &rd.ReviewerID, &rd.SellerID, &rd.Rating, &rd.Content, &rd.Anonymous, &rd.Status, &rd.CreateTime,
 			&nick, &title, &img,
 		)
 		if err != nil {
 			return nil, 0, fmt.Errorf("scan review: %w", err)
 		}
-		if nick.Valid {
+		if nick.Valid && !rd.Anonymous {
 			rd.ReviewerNickname = &nick.String
+		}
+		if rd.Anonymous {
+			rd.ReviewerID = 0
 		}
 		rd.ProductTitle = title.String
 		if img.Valid {
@@ -170,7 +176,7 @@ func (r *Repository) GetAverageRating(ctx context.Context, sellerID uint64) (flo
 func scanReview(row *sql.Row) (*Review, error) {
 	var r Review
 	var content sql.NullString
-	err := row.Scan(&r.ID, &r.OrderID, &r.ProductID, &r.ReviewerID, &r.SellerID, &r.Rating, &content, &r.Status, &r.CreateTime, &r.IsDeleted)
+	err := row.Scan(&r.ID, &r.OrderID, &r.ProductID, &r.ReviewerID, &r.SellerID, &r.Rating, &content, &r.Anonymous, &r.Status, &r.CreateTime, &r.IsDeleted)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil

@@ -21,6 +21,7 @@ type CreateReviewInput struct {
 	ReviewerID uint64
 	Rating     int
 	Content    *string
+	Anonymous  bool
 }
 
 func (s *Service) Create(ctx context.Context, input CreateReviewInput) (*Review, error) {
@@ -60,6 +61,7 @@ func (s *Service) Create(ctx context.Context, input CreateReviewInput) (*Review,
 		SellerID:   sellerID,
 		Rating:     input.Rating,
 		Content:    input.Content,
+		Anonymous:  input.Anonymous,
 		Status:     "NORMAL",
 	}
 

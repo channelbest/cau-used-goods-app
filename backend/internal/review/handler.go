@@ -19,9 +19,10 @@ func NewHandler(service *Service) *Handler {
 }
 
 type createReviewRequest struct {
-	OrderID uint64  `json:"orderId" binding:"required"`
-	Rating  int     `json:"rating" binding:"required,min=1,max=5"`
-	Content *string `json:"content"`
+	OrderID   uint64  `json:"orderId" binding:"required"`
+	Rating    int     `json:"rating" binding:"required,min=1,max=5"`
+	Content   *string `json:"content"`
+	Anonymous bool    `json:"anonymous"`
 }
 
 func (h *Handler) Create(c *gin.Context) {
@@ -42,6 +43,7 @@ func (h *Handler) Create(c *gin.Context) {
 		ReviewerID: userID,
 		Rating:     req.Rating,
 		Content:    req.Content,
+		Anonymous:  req.Anonymous,
 	})
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, response.CodeBadRequest, err.Error())
@@ -65,6 +67,9 @@ func (h *Handler) GetByID(c *gin.Context) {
 	if review == nil {
 		response.Error(c, http.StatusNotFound, response.CodeNotFound, "review not found")
 		return
+	}
+	if review.Anonymous {
+		review.ReviewerID = 0
 	}
 	response.Success(c, review)
 }
