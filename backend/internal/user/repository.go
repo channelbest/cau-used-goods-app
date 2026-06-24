@@ -161,6 +161,7 @@ type UserReviewItem struct {
 	SellerNickname   *string `json:"sellerNickname,omitempty"`
 	Rating           int     `json:"rating"`
 	Content          *string `json:"content,omitempty"`
+	Anonymous        bool    `json:"anonymous"`
 	Status           string  `json:"status"`
 	CreateTime       string  `json:"createTime"`
 }
@@ -640,7 +641,7 @@ SELECT rv.id,
        CASE WHEN rv.reviewer_id = ? THEN 'GIVEN' ELSE 'RECEIVED' END,
        rv.order_id, rv.product_id, p.title,
        rv.reviewer_id, reviewer.nickname, rv.seller_id, seller.nickname,
-       rv.rating, rv.content, rv.status,
+       rv.rating, rv.content, rv.is_anonymous, rv.status,
        DATE_FORMAT(rv.create_time, '%Y-%m-%d %H:%i:%s')
 FROM reviews rv
 LEFT JOIN products p ON p.id = rv.product_id
@@ -659,7 +660,7 @@ LIMIT ? OFFSET ?`, userID, userID, userID, pageSize, (page-1)*pageSize)
 		if err := rows.Scan(
 			&item.ID, &item.Relation, &item.OrderID, &item.ProductID, &item.ProductTitle,
 			&item.ReviewerID, &item.ReviewerNickname, &item.SellerID, &item.SellerNickname,
-			&item.Rating, &item.Content, &item.Status, &item.CreateTime,
+			&item.Rating, &item.Content, &item.Anonymous, &item.Status, &item.CreateTime,
 		); err != nil {
 			return nil, 0, fmt.Errorf("scan user review: %w", err)
 		}

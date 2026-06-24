@@ -103,5 +103,12 @@ CALL `add_column_if_missing`(
 ALTER TABLE `reports`
   MODIFY COLUMN `status` VARCHAR(30) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING / PROCESSING / APPROVED / REJECTED / CLOSED';
 
+CALL `add_column_if_missing`(
+  'reviews',
+  'is_anonymous',
+  'TINYINT(1) NOT NULL DEFAULT 0 COMMENT ''是否匿名评价''',
+  'content'
+);
+
 DROP PROCEDURE IF EXISTS `add_index_if_missing`;
 DROP PROCEDURE IF EXISTS `add_column_if_missing`;
