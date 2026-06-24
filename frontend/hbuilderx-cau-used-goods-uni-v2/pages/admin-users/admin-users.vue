@@ -65,23 +65,29 @@
           <view>商品 {{ detail.stats.productCount || 0 }}</view>
           <view>订单 {{ detail.stats.orderCount || 0 }}</view>
           <view>举报 {{ detail.stats.reportSubmittedCount || 0 }}/被举报 {{ detail.stats.reportedCount || 0 }}</view>
+          <view>申诉 {{ detail.stats.appealCount || 0 }}</view>
         </view>
         <view class="related-title">发布商品</view>
         <view v-if="related.products.length === 0" class="muted">暂无商品</view>
-        <view v-for="product in related.products" :key="product.id" class="related-line" @click="openProduct(product)">
+        <view v-for="product in related.products" :key="product.id" class="related-line clickable" @click="openProduct(product)">
           {{ product.title }} · {{ productStatusText(product.status) }} · ¥{{ product.price }}
         </view>
 
         <view class="related-title">相关订单</view>
         <view v-if="related.orders.length === 0" class="muted">暂无订单</view>
-        <view v-for="order in related.orders" :key="order.id" class="related-line">
+        <view v-for="order in related.orders" :key="order.id" class="related-line clickable" @click="openOrder(order)">
           {{ order.productTitleSnapshot }} · {{ orderStatusText(order.status) }}
         </view>
 
         <view class="related-title">相关举报</view>
         <view v-if="related.reports.length === 0" class="muted">暂无举报</view>
-        <view v-for="report in related.reports" :key="report.id" class="related-line">
+        <view v-for="report in related.reports" :key="report.id" class="related-line clickable" @click="openRiskDetail('REPORT', report)">
           {{ report.relation === 'SUBMITTED' ? '发起' : '被举报' }} · {{ reportReasonText(report.reasonType) }} · {{ reportStatusText(report.status) }}
+        </view>
+        <view class="related-title">相关申诉</view>
+        <view v-if="related.appeals.length === 0" class="muted">暂无申诉</view>
+        <view v-for="appeal in related.appeals" :key="appeal.id" class="related-line clickable" @click="openRiskDetail('APPEAL', appeal)">
+          {{ appeal.relation === 'SUBMITTED' ? '发起' : '相关' }} · {{ appealTargetText(appeal.targetType) }} · {{ reportStatusText(appeal.status) }}
         </view>
       </view>
     </view>
@@ -103,6 +109,7 @@ import {
   getAdminUserProducts,
   getAdminUserOrders,
   getAdminUserReports,
+  getAdminUserAppeals,
   updateAdminUserStatus,
   updateAdminUserRole
 } from '../../api/admin'
@@ -115,7 +122,7 @@ const pageSize = 10
 const total = ref(0)
 const expandedId = ref(null)
 const detail = ref({})
-const related = ref({ products: [], orders: [], reports: [] })
+const related = ref({ products: [], orders: [], reports: [], appeals: [] })
 const filters = ref({ keyword: '', accountStatus: '', authStatus: '', role: '' })
 
 const accountOptions = [
@@ -242,12 +249,26 @@ function reportReasonText(reasonType) {
   }[reasonType] || reasonType || '举报'
 }
 
+function appealTargetText(targetType) {
+  return { PRODUCT: '商品', USER: '用户', ORDER: '订单', REPORT: '举报' }[targetType] || targetType || '对象'
+}
+
 function openUserHome(item) {
   uni.navigateTo({ url: `/pages/user-profile/user-profile?id=${item.id}&adminView=1&hideAdminActions=1` })
 }
 
 function openProduct(item) {
   uni.navigateTo({ url: `/pages/detail/detail?id=${item.id}&adminView=1&readonly=1` })
+}
+
+function openOrder(item) {
+  if (!item?.id) return
+  uni.navigateTo({ url: `/pages/order/detail?id=${item.id}&adminView=1&readonly=1` })
+}
+
+function openRiskDetail(mode, item) {
+  if (!item?.id) return
+  uni.navigateTo({ url: `/pages/admin-risk-detail/admin-risk-detail?mode=${mode}&id=${item.id}` })
 }
 
 async function toggleRelated(item) {
@@ -257,19 +278,21 @@ async function toggleRelated(item) {
   }
   expandedId.value = item.id
   detail.value = {}
-  related.value = { products: [], orders: [], reports: [] }
+  related.value = { products: [], orders: [], reports: [], appeals: [] }
   try {
-    const [userDetail, products, orders, reports] = await Promise.all([
+    const [userDetail, products, orders, reports, appeals] = await Promise.all([
       getAdminUserDetail(item.id),
       getAdminUserProducts(item.id),
       getAdminUserOrders(item.id),
-      getAdminUserReports(item.id)
+      getAdminUserReports(item.id),
+      getAdminUserAppeals(item.id)
     ])
     detail.value = userDetail || {}
     related.value = {
       products: products?.items || [],
       orders: orders?.items || [],
-      reports: reports?.items || []
+      reports: reports?.items || [],
+      appeals: appeals?.items || []
     }
   } catch (error) {
     uni.showToast({ title: error.message || '关联信息加载失败', icon: 'none' })
@@ -360,6 +383,9 @@ onShow(loadUsers)
 .stats { display: flex; flex-wrap: wrap; gap: 14rpx; color: #344054; font-size: 24rpx; }
 .related-title { margin-top: 18rpx; color: #1f2933; font-size: 26rpx; font-weight: 800; }
 .related-line { margin-top: 10rpx; padding: 12rpx 14rpx; border-radius: 10rpx; background: #f7f8fa; color: #475467; font-size: 24rpx; line-height: 1.45; }
+.related-line.clickable { position: relative; padding-right: 42rpx; }
+.related-line.clickable::after { content: '›'; position: absolute; right: 16rpx; top: 50%; transform: translateY(-50%); color: #98a2b3; font-size: 30rpx; }
+.related-line.clickable:active { background: #eef6f1; color: #207f55; }
 .pager { display: flex; align-items: center; justify-content: center; gap: 20rpx; padding: 20rpx 0 40rpx; }
 .page-btn { width: 150rpx; height: 60rpx; line-height: 60rpx; border-radius: 12rpx; background: #fff; color: #344054; font-size: 24rpx; }
 .page-text { color: #667085; font-size: 24rpx; }

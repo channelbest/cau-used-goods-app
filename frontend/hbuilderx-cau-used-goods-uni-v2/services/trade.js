@@ -155,7 +155,10 @@ export const tradeService = {
     if (!order) throw new Error('订单不存在或不在当前管理员列表中')
     return normalizeOrder(order)
   },
-  changeOrderStatus: async (id, action, data) => normalizeOrder(await api.changeOrderStatus(id, action, data)),
+  changeOrderStatus: async (id, action, data) => {
+    await api.changeOrderStatus(id, action, data)
+    return getOrderWithImage(id)
+  },
   getFavorites: async () => (await api.getFavorites()).items.map((item) => normalizeProduct({
     id: item.productId,
     title: item.productTitle,

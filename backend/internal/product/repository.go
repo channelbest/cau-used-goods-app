@@ -467,8 +467,15 @@ func (r *Repository) GetProductByID(ctx context.Context, id uint64, viewer Produ
 		      status = 'ON_SALE'
 		      OR seller_id = ?
 		      OR ? IN ('ADMIN', 'SUPER_ADMIN')
+		      OR EXISTS (
+		          SELECT 1
+		          FROM orders o
+		          WHERE o.product_id = products.id
+		            AND (o.buyer_id = ? OR o.seller_id = ?)
+		            AND o.status IN ('PENDING_CONFIRM', 'WAIT_MEET', 'COMPLETED')
+		      )
 		  )
-	`, id, viewer.UserID, viewer.Role).Scan(
+	`, id, viewer.UserID, viewer.Role, viewer.UserID, viewer.UserID).Scan(
 		&p.ID, &p.SellerID, &p.CategoryID, &p.Title, &desc, &originalPrice,
 		&p.Price, &condition, &location, &p.Status, &offShelfBy, &p.ViewCount,
 		&p.FavoriteCount, &p.CreateTime,
