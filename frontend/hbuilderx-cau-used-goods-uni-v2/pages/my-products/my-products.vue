@@ -24,7 +24,8 @@
         </view>
         <view v-if="canEdit(item)" class="actions">
           <button v-if="item.status === 'ON_SALE'" class="action muted-action" @click="changeStatus(item, 'OFF_SHELF')">下架</button>
-          <button v-if="item.status === 'OFF_SHELF'" class="action primary-action" @click="changeStatus(item, 'ON_SALE')">上架</button>
+          <button v-if="canPutOnSale(item)" class="action primary-action" @click="changeStatus(item, 'ON_SALE')">上架</button>
+          <text v-else-if="offShelfTip(item)" class="off-shelf-tip">{{ offShelfTip(item) }}</text>
           <button v-if="canEdit(item)" class="action" @click="editProduct(item)">编辑</button>
           <button v-if="canEdit(item)" class="action danger-action" @click="deleteMyProduct(item)">删除</button>
         </view>
@@ -76,12 +77,24 @@ const goPublish = () => {
   uni.switchTab({ url: '/pages/publish/publish' })
 }
 const canEdit = (item) => ['ON_SALE', 'OFF_SHELF'].includes(item.status)
+const offShelfBy = (item) => String(item.offShelfBy || item.off_shelf_by || '').toUpperCase()
+const canPutOnSale = (item) => item.status === 'OFF_SHELF' && offShelfBy(item) === 'USER'
+const offShelfTip = (item) => {
+  if (item.status !== 'OFF_SHELF') return ''
+  const source = offShelfBy(item)
+  if (source === 'ADMIN') return '管理员已下架'
+  if (source === 'SYSTEM') return '系统已下架'
+  if (!source) return '暂不可上架'
+  return ''
+}
 
 const normalizeStatusError = (error, status = 'ON_SALE') => {
   const message = String(error?.message || '')
   if (/BANNED|PERM_BANNED|PERMANENT_BANNED|\u5c01\u7981/i.test(message)) return userTradeRestrictionMessage('BANNED', 'sale')
   if (/DISABLED|\u7981\u7528/i.test(message)) return userTradeRestrictionMessage('DISABLED', 'sale')
   if (/CANCELED|CANCELLED|\u6ce8\u9500/i.test(message)) return userTradeRestrictionMessage('CANCELED', 'sale')
+  if (/管理员下架|admin/i.test(message)) return '管理员下架的商品不能自行上架'
+  if (/系统下架|system/i.test(message)) return '系统下架的商品不能自行上架'
   if (/403|FORBIDDEN|PERMISSION|VERIFY|VERIFIED|\u6743\u9650/i.test(message)) {
     return status === 'ON_SALE' ? '\u8d26\u53f7\u72b6\u6001\u4e0d\u6ee1\u8db3\u4e0a\u67b6\u6761\u4ef6' : '\u8d26\u53f7\u72b6\u6001\u4e0d\u6ee1\u8db3\u4e0b\u67b6\u6761\u4ef6'
   }
@@ -179,6 +192,7 @@ onPullDownRefresh(loadData)
 .muted-action { background: #f4f1ed; color: #9a7745; }
 .primary-action { background: #23734f; color: #fff; }
 .danger-action { background: #fff1ef; color: #d85c45; }
+.off-shelf-tip { display: flex; min-width: 132rpx; height: 58rpx; align-items: center; justify-content: center; padding: 0 18rpx; border-radius: 999rpx; background: #f3f0ec; color: #9a7745; font-size: 23rpx; }
 .empty { margin-top: 140rpx; padding: 44rpx 28rpx; border-radius: 18rpx; background: #fff; text-align: center; }
 .empty-title { margin-bottom: 12rpx; color: #26342f; font-size: 32rpx; font-weight: 700; }
 .empty-button { width: 180rpx; margin-top: 28rpx; }
