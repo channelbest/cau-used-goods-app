@@ -296,6 +296,8 @@ function openSeller() {
   navigate('/pages/user-profile/user-profile', {
     id: sellerId.value,
     adminView: adminView.value ? 1 : '',
+    relatedType: relatedType.value,
+    relatedId: relatedId.value,
     productId,
     productTitle: order.value?.product?.title || order.value?.productTitleSnapshot || ''
   })

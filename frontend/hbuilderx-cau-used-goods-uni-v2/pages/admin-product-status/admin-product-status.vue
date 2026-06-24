@@ -91,7 +91,11 @@ const goSellerProfile = () => {
     uni.showToast({ title: '暂无卖家信息', icon: 'none' })
     return
   }
-  uni.navigateTo({ url: `/pages/user-profile/user-profile?id=${sellerId.value}&adminView=1` })
+  const query = [`id=${sellerId.value}`, 'adminView=1']
+  if (relatedType.value && relatedId.value) {
+    query.push(`relatedType=${relatedType.value}`, `relatedId=${relatedId.value}`)
+  }
+  uni.navigateTo({ url: `/pages/user-profile/user-profile?${query.join('&')}` })
 }
 </script>
 

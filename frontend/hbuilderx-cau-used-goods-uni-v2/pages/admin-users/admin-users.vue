@@ -243,7 +243,7 @@ function reportReasonText(reasonType) {
 }
 
 function openUserHome(item) {
-  uni.navigateTo({ url: `/pages/user-profile/user-profile?id=${item.id}&adminView=1` })
+  uni.navigateTo({ url: `/pages/user-profile/user-profile?id=${item.id}&adminView=1&hideAdminActions=1` })
 }
 
 function openProduct(item) {
