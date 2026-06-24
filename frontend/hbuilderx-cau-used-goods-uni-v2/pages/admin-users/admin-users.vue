@@ -247,7 +247,7 @@ function openUserHome(item) {
 }
 
 function openProduct(item) {
-  uni.navigateTo({ url: `/pages/detail/detail?id=${item.id}` })
+  uni.navigateTo({ url: `/pages/detail/detail?id=${item.id}&adminView=1&readonly=1` })
 }
 
 async function toggleRelated(item) {

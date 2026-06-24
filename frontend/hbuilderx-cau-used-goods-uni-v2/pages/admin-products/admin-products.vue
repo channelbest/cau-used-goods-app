@@ -12,7 +12,7 @@
     </view>
 
     <view v-if="filteredProducts.length === 0" class="empty">{{ products.length ? '没有匹配商品' : '暂无商品' }}</view>
-    <view v-for="item in filteredProducts" :key="item.id" class="card" @click="goStatus(item.id)">
+    <view v-for="item in filteredProducts" :key="item.id" class="card" @click="goDetail(item.id)">
       <image v-if="coverImage(item)" class="cover" :src="coverImage(item)" mode="aspectFill" />
       <view v-else class="cover placeholder">商品</view>
       <view class="card-main">
@@ -62,9 +62,9 @@ const coverImage = (item) => {
   return normalizeImage(item?.images?.[0] || '')
 }
 
-const goStatus = (id) => {
+const goDetail = (id) => {
   uni.navigateTo({
-    url: `/pages/admin-product-status/admin-product-status?id=${id}`
+    url: `/pages/detail/detail?id=${id}&adminView=1&readonly=1`
   })
 }
 </script>

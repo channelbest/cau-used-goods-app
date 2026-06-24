@@ -25,6 +25,21 @@
       </view>
     </view>
 
+    <view v-if="adminView" class="card admin-info-card">
+      <view class="info-row">
+        <text class="info-label">商品ID</text>
+        <text class="info-value">{{ product.id || '-' }}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">卖家ID</text>
+        <text class="info-value">{{ sellerId || '-' }}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">买家ID</text>
+        <text class="info-value">{{ buyerDisplayText }}</text>
+      </view>
+    </view>
+
     <view class="card">
       <view class="section-title">商品描述</view>
       <view class="description">{{ product.description || '卖家暂未填写描述' }}</view>
@@ -40,8 +55,6 @@
       </view>
       <text class="seller-arrow">›</text>
     </view>
-
-    <view v-if="readonlyMode" class="readonly-tip">{{ adminView ? '管理员只读查看，可在底部调整商品状态' : '该商品仅可查看' }}</view>
 
     <view class="bottom" :class="{ admin: adminView }">
       <template v-if="adminView">
@@ -91,7 +104,7 @@ import {
   listCategories,
   removeFavorite
 } from '../../api/product'
-import { updateAdminProductStatus } from '../../api/admin'
+import { getAdminOrders, getAdminProductById, updateAdminProductStatus } from '../../api/admin'
 import { createOrGetConversation } from '../../api/chat'
 import { getPublicProfile } from '../../api/user'
 import { buildCategoryMap, formatPrice, formatProduct, getStatusText, normalizeImage } from '../../utils/product-format'
@@ -146,6 +159,18 @@ const sellerId = computed(() => (
   || product.value?.owner_id
   || ''
 ))
+const buyerId = computed(() => (
+  product.value?.buyerId
+  || product.value?.buyer_id
+  || product.value?.buyer?.id
+  || product.value?.order?.buyerId
+  || product.value?.order?.buyer_id
+  || ''
+))
+const buyerDisplayText = computed(() => {
+  if (buyerId.value) return buyerId.value
+  return product.value?.status === 'SOLD' ? '无匹配订单' : '暂无买家'
+})
 const sellerSource = computed(() => sellerProfile.value || product.value?.seller || {})
 const sellerAccountStatus = computed(() => accountStatusOf(sellerSource.value))
 const sellerName = computed(() => displayUserName(sellerSource.value, 'CAU 同学'))
@@ -179,6 +204,49 @@ const actionText = computed(() => {
   if (currentUserRestricted.value) return '账号受限'
   return product.value?.status === 'ON_SALE' ? '提交预约' : statusText.value
 })
+
+const detailCacheKey = (id) => `${adminView.value ? 'admin-product-detail-cache' : 'product-detail-cache'}-${id}`
+
+function sanitizePublicProduct(record) {
+  if (!record || typeof record !== 'object') return record
+  const publicRecord = { ...record }
+  delete publicRecord.buyerId
+  delete publicRecord.buyer_id
+  delete publicRecord.buyer
+  delete publicRecord.order
+  return publicRecord
+}
+
+function cacheProductDetail(id, record) {
+  if (!id || !record) return
+  if (adminView.value) {
+    uni.setStorageSync(detailCacheKey(id), record)
+    uni.removeStorageSync(`product-detail-cache-${id}`)
+    return
+  }
+  uni.setStorageSync(detailCacheKey(id), sanitizePublicProduct(record))
+}
+
+async function fillAdminBuyerFromOrders(productId) {
+  if (!adminView.value || !productId || buyerId.value) return
+  try {
+    const result = await getAdminOrders('ALL', { pageSize: 50 })
+    const list = Array.isArray(result) ? result : (result?.items || result?.list || [])
+    const priority = { WAIT_MEET: 1, PENDING_CONFIRM: 2, COMPLETED: 3 }
+    const order = list
+      .filter((item) => (
+        String(item.productId || item.product_id || item.product?.id || '') === String(productId)
+        && ['PENDING_CONFIRM', 'WAIT_MEET', 'COMPLETED'].includes(item.status)
+      ))
+      .sort((a, b) => (priority[a.status] || 99) - (priority[b.status] || 99))[0]
+    const fallbackBuyerId = order?.buyerId || order?.buyer_id || order?.buyer?.id
+    if (!fallbackBuyerId) return
+    product.value = { ...product.value, buyerId: fallbackBuyerId }
+    cacheProductDetail(productId, product.value)
+  } catch (error) {
+    // 商品详情可正常展示，买家兜底失败时不阻塞页面。
+  }
+}
 
 function toast(title, icon = 'none') {
   uni.showToast({ title, icon })
@@ -224,7 +292,7 @@ function changeAdminProductStatus(status) {
       try {
         await updateAdminProductStatus(product.value.id, status, adminRelatedPayload())
         product.value = { ...product.value, status }
-        uni.setStorageSync(`product-detail-cache-${product.value.id}`, product.value)
+        cacheProductDetail(product.value.id, product.value)
         toast(status === 'ON_SALE' ? '已上架' : '已下架', 'success')
       } catch (error) {
         toast(error.message || '商品状态更新失败')
@@ -259,7 +327,7 @@ async function loadSellerProfile() {
     const avatar = normalizeImage(pick(profile?.avatarUrl, profile?.avatar, profile?.avatar_url))
     sellerAvatarFile.value = await localizeHttpImage(avatar)
     sellerProfile.value = profile
-    if (isBannedUserStatus(accountStatusOf(profile?.user || profile))) {
+    if (!adminView.value && isBannedUserStatus(accountStatusOf(profile?.user || profile))) {
       bannedSellerBlocked.value = true
     }
   } catch (error) {
@@ -414,7 +482,7 @@ async function loadOwnProductFallback(id, options = {}) {
     const ownProduct = list.find((item) => String(item.id) === String(id))
     if (!ownProduct) return false
     product.value = applySnapshotOverrides(formatProduct(ownProduct, buildCategoryMap(categories)), options)
-    uni.setStorageSync(`product-detail-cache-${id}`, product.value)
+    cacheProductDetail(id, product.value)
     failedImages.value = []
     await loadSellerProfile()
     await loadFavoriteState(id)
@@ -444,7 +512,7 @@ onLoad(async (options) => {
   adminView.value = options.adminView === '1' || options.adminView === 1
   relatedType.value = String(options.relatedType || '').toUpperCase()
   relatedId.value = options.relatedId || ''
-  bannedSellerBlocked.value = isBlockedSellerSnapshot(options)
+  bannedSellerBlocked.value = !adminView.value && isBlockedSellerSnapshot(options)
   if (!id) {
     toast('商品不存在')
     return
@@ -452,31 +520,35 @@ onLoad(async (options) => {
   if (bannedSellerBlocked.value) return
 
   try {
-    const [detail, categories] = await Promise.all([getProductById(id), listCategories()])
+    const detailRequest = adminView.value ? getAdminProductById(id) : getProductById(id)
+    const [detail, categories] = await Promise.all([detailRequest, listCategories()])
     product.value = adminView.value
       ? applySnapshotOverrides(formatProduct(detail, buildCategoryMap(categories)), options)
       : formatProduct(detail, buildCategoryMap(categories))
-    uni.setStorageSync(`product-detail-cache-${id}`, product.value)
-    addBrowseHistory(product.value)
+    cacheProductDetail(id, product.value)
+    if (!adminView.value) addBrowseHistory(product.value)
     failedImages.value = []
     await loadSellerProfile()
+    await fillAdminBuyerFromOrders(id)
     await loadFavoriteState(id)
     await loadChatEligibility(id)
   } catch (error) {
     if (!readonlyMode.value && await loadOwnProductFallback(id, options)) return
 
-    const cached = uni.getStorageSync(`product-detail-cache-${id}`)
+    const cached = uni.getStorageSync(detailCacheKey(id))
     if (cached) {
-      product.value = adminView.value ? applySnapshotOverrides(cached, options) : cached
+      product.value = adminView.value ? applySnapshotOverrides(cached, options) : sanitizePublicProduct(cached)
+      if (!adminView.value) cacheProductDetail(id, product.value)
       failedImages.value = []
       await loadSellerProfile()
+      await fillAdminBuyerFromOrders(id)
       await loadFavoriteState(id)
       await loadChatEligibility(id)
       if (!readonlyMode.value) toast('商品暂不可查看，显示最近一次详情')
       return
     }
     if (readonlyMode.value) {
-      if (isBlockedSellerSnapshot(options)) {
+      if (!adminView.value && isBlockedSellerSnapshot(options)) {
         bannedSellerBlocked.value = true
         return
       }
@@ -503,6 +575,10 @@ onLoad(async (options) => {
 .meta.single { display: block; margin-top: 6rpx; }
 .section-title, .seller-name { font-weight: 700; color: #1f2933; }
 .description { margin-top: 16rpx; color: #58645f; line-height: 1.7; white-space: pre-line; word-break: break-word; }
+.admin-info-card { border-left: 8rpx solid #23734f; }
+.info-row { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; margin-top: 16rpx; }
+.info-label { flex-shrink: 0; color: #667085; font-size: 25rpx; }
+.info-value { min-width: 0; color: #1f2933; font-size: 26rpx; font-weight: 700; word-break: break-all; text-align: right; }
 .seller { justify-content: flex-start; gap: 16rpx; }
 .seller-label { color: #9aa5a1; font-size: 24rpx; }
 .avatar { display: flex; width: 84rpx; height: 84rpx; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 50%; background: #e7f4ec; color: #23734f; font-weight: 700; }

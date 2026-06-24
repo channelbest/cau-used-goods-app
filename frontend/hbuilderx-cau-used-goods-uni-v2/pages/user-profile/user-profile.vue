@@ -236,7 +236,11 @@ onLoad(async (options) => {
 
 function openProduct(id) {
   if (!id) return
-  navigate('/pages/detail/detail', { id })
+  navigate('/pages/detail/detail', {
+    id,
+    adminView: adminView.value ? 1 : '',
+    readonly: adminView.value ? 1 : ''
+  })
 }
 
 function reportUser() {
