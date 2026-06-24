@@ -83,7 +83,7 @@ func (r *Repository) UpdateStatus(ctx context.Context, tx *sql.Tx, id uint64, st
 }
 
 func (r *Repository) LockProduct(ctx context.Context, tx *sql.Tx, productID uint64) error {
-	query := "UPDATE products SET status = 'LOCKED' WHERE id = ? AND status = 'ON_SALE'"
+	query := "UPDATE products SET status = 'LOCKED', off_shelf_reason = NULL, off_shelf_by = NULL WHERE id = ? AND status = 'ON_SALE'"
 	var result sql.Result
 	var err error
 	if tx != nil {
@@ -105,7 +105,7 @@ func (r *Repository) LockProduct(ctx context.Context, tx *sql.Tx, productID uint
 }
 
 func (r *Repository) UnlockProduct(ctx context.Context, tx *sql.Tx, productID uint64) error {
-	query := "UPDATE products SET status = 'ON_SALE' WHERE id = ? AND status = 'LOCKED'"
+	query := "UPDATE products SET status = 'ON_SALE', off_shelf_reason = NULL, off_shelf_by = NULL WHERE id = ? AND status = 'LOCKED'"
 	var result sql.Result
 	var err error
 	if tx != nil {
@@ -127,7 +127,7 @@ func (r *Repository) UnlockProduct(ctx context.Context, tx *sql.Tx, productID ui
 }
 
 func (r *Repository) UnlockProductIfLocked(ctx context.Context, tx *sql.Tx, productID uint64) error {
-	query := "UPDATE products SET status = 'ON_SALE' WHERE id = ? AND status = 'LOCKED'"
+	query := "UPDATE products SET status = 'ON_SALE', off_shelf_reason = NULL, off_shelf_by = NULL WHERE id = ? AND status = 'LOCKED'"
 	if tx != nil {
 		_, err := tx.ExecContext(ctx, query, productID)
 		if err != nil {
@@ -146,6 +146,7 @@ func (r *Repository) OffShelfLockedProduct(ctx context.Context, tx *sql.Tx, prod
 		UPDATE products
 		SET status = 'OFF_SHELF',
 		    off_shelf_reason = ?,
+		    off_shelf_by = 'SYSTEM',
 		    update_time = CURRENT_TIMESTAMP
 		WHERE id = ?
 		  AND is_deleted = 0
@@ -165,7 +166,7 @@ func (r *Repository) OffShelfLockedProduct(ctx context.Context, tx *sql.Tx, prod
 }
 
 func (r *Repository) MarkProductSold(ctx context.Context, tx *sql.Tx, productID uint64) error {
-	query := "UPDATE products SET status = 'SOLD' WHERE id = ? AND status = 'LOCKED'"
+	query := "UPDATE products SET status = 'SOLD', off_shelf_reason = NULL, off_shelf_by = NULL WHERE id = ? AND status = 'LOCKED'"
 	var result sql.Result
 	var err error
 	if tx != nil {
@@ -190,6 +191,8 @@ func (r *Repository) UpdateProductStatusForAdmin(ctx context.Context, tx *sql.Tx
 	query := `
 		UPDATE products
 		SET status = ?,
+		    off_shelf_reason = CASE WHEN ? IN ('ON_SALE', 'LOCKED', 'SOLD') THEN NULL ELSE off_shelf_reason END,
+		    off_shelf_by = CASE WHEN ? IN ('ON_SALE', 'LOCKED', 'SOLD') THEN NULL ELSE off_shelf_by END,
 		    is_deleted = CASE WHEN ? = 'DELETED' THEN 1 ELSE 0 END,
 		    update_time = CURRENT_TIMESTAMP
 		WHERE id = ?
@@ -197,9 +200,9 @@ func (r *Repository) UpdateProductStatusForAdmin(ctx context.Context, tx *sql.Tx
 	var result sql.Result
 	var err error
 	if tx != nil {
-		result, err = tx.ExecContext(ctx, query, status, status, productID)
+		result, err = tx.ExecContext(ctx, query, status, status, status, status, productID)
 	} else {
-		result, err = r.db.ExecContext(ctx, query, status, status, productID)
+		result, err = r.db.ExecContext(ctx, query, status, status, status, status, productID)
 	}
 	if err != nil {
 		return fmt.Errorf("update product status for admin: %w", err)
