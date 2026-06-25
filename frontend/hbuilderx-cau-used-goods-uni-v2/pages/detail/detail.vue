@@ -46,7 +46,7 @@
     </view>
 
     <view class="card seller" @click="openSeller">
-      <image v-if="sellerAvatarUrl" class="avatar image-avatar" :src="sellerAvatarUrl" mode="aspectFill" />
+      <image v-if="sellerAvatarUrl" class="avatar image-avatar" :src="sellerAvatarUrl" mode="aspectFill" @error="markSellerAvatarFailed" />
       <view v-else class="avatar">{{ sellerAvatarText }}</view>
       <view class="seller-body">
         <view class="seller-label">卖家信息</view>
@@ -61,6 +61,10 @@
         <button v-if="product.status === 'ON_SALE'" class="admin-action danger" @click="changeAdminProductStatus('OFF_SHELF')">下架商品</button>
         <button v-else-if="product.status === 'OFF_SHELF'" class="admin-action primary-admin" @click="changeAdminProductStatus('ON_SALE')">上架商品</button>
         <button v-else class="admin-action disabled" disabled>{{ statusText }}</button>
+      </template>
+      <template v-else-if="canAppealProductOffShelf">
+        <button class="appeal-action" @click="appealProductOffShelf">申诉下架</button>
+        <button class="primary disabled" disabled>{{ statusText }}</button>
       </template>
       <template v-else>
         <button
@@ -80,7 +84,7 @@
           !
         </button>
         <button class="chat" :disabled="!canChat" @click="chat">聊一聊</button>
-        <button class="primary" :disabled="readonlyMode || isOwnProduct || product.status !== 'ON_SALE' || currentUserRestricted" @click="reserve">
+        <button class="primary" :disabled="readonlyMode || isOwnProduct || productStatus !== 'ON_SALE' || currentUserRestricted" @click="reserve">
           {{ actionText }}
         </button>
       </template>
@@ -123,6 +127,7 @@ const relatedId = ref('')
 const bannedSellerBlocked = ref(false)
 const sellerProfile = ref(null)
 const sellerAvatarFile = ref('')
+const failedSellerAvatars = ref([])
 const isReservedBuyer = ref(false)
 
 const currentUserStatus = computed(() => {
@@ -141,12 +146,15 @@ const currentUserRestrictionText = computed(() => {
 })
 const canChat = computed(() => {
   if (readonlyMode.value || isOwnProduct.value || currentUserRestricted.value) return false
-  if (product.value?.status === 'ON_SALE') return true
-  return product.value?.status === 'LOCKED' && isReservedBuyer.value
+  if (productStatus.value === 'ON_SALE') return true
+  return productStatus.value === 'LOCKED' && isReservedBuyer.value
 })
 
 const pick = (...values) => values.find((value) => value !== undefined && value !== null && value !== '') || ''
-const statusText = computed(() => getStatusText(product.value?.status))
+const normalizeCode = (value) => String(value || '').trim().toUpperCase()
+const productStatus = computed(() => normalizeCode(product.value?.status || product.value?.productStatus || product.value?.product_status))
+const offShelfBy = computed(() => normalizeCode(product.value?.offShelfBy || product.value?.off_shelf_by))
+const statusText = computed(() => getStatusText(productStatus.value))
 const favoriteCount = computed(() => Number(product.value?.favoriteCount || product.value?.favorite_count || 0))
 const visibleImages = computed(() => (product.value?.images || []).filter((image) => !failedImages.value.includes(image)))
 const sellerId = computed(() => (
@@ -169,17 +177,38 @@ const buyerId = computed(() => (
 ))
 const buyerDisplayText = computed(() => {
   if (buyerId.value) return buyerId.value
-  return product.value?.status === 'SOLD' ? '无匹配订单' : '暂无买家'
+  return productStatus.value === 'SOLD' ? '无匹配订单' : '暂无买家'
 })
-const sellerSource = computed(() => sellerProfile.value || product.value?.seller || {})
+const sellerPublicProfile = computed(() => sellerProfile.value?.profile || sellerProfile.value?.user || sellerProfile.value || {})
+const sellerFallback = computed(() => product.value?.seller || product.value || {})
+const sellerSource = computed(() => ({
+  ...sellerFallback.value,
+  ...sellerPublicProfile.value
+}))
 const sellerAccountStatus = computed(() => accountStatusOf(sellerSource.value))
 const sellerName = computed(() => displayUserName(sellerSource.value, 'CAU 同学'))
-const sellerAvatarUrl = computed(() => sellerAvatarFile.value || normalizeImage(pick(
-  sellerSource.value?.avatarUrl,
-  sellerSource.value?.avatar,
-  sellerSource.value?.avatar_url
-)))
-const sellerCollege = computed(() => sellerSource.value?.college || '中国农业大学')
+const sellerAvatarUrl = computed(() => {
+  const candidates = [
+    sellerAvatarFile.value,
+    sellerPublicProfile.value?.avatarUrl,
+    sellerPublicProfile.value?.avatar,
+    sellerPublicProfile.value?.avatar_url,
+    sellerSource.value?.avatarUrl,
+    sellerSource.value?.avatar,
+    sellerSource.value?.avatar_url,
+    product.value?.sellerAvatarUrl,
+    product.value?.seller_avatar_url,
+    product.value?.seller?.avatarUrl,
+    product.value?.seller?.avatar,
+    product.value?.seller?.avatar_url
+  ]
+  for (const value of candidates) {
+    const url = normalizeImage(value)
+    if (url && !failedSellerAvatars.value.includes(url)) return url
+  }
+  return ''
+})
+const sellerCollege = computed(() => sellerSource.value?.college || sellerFallback.value?.college || '中国农业大学')
 const isOwnProduct = computed(() => {
   const user = getUser() || {}
   const currentUserId = pick(user.id, user.userId, user.user_id)
@@ -193,6 +222,13 @@ const isOwnProduct = computed(() => {
   return (currentUserId && sellerId.value && String(sellerId.value) === String(currentUserId))
     || (currentOpenid && sellerOpenid && String(currentOpenid) === String(sellerOpenid))
 })
+const canAppealProductOffShelf = computed(() => (
+  !adminView.value
+  && !readonlyMode.value
+  && isOwnProduct.value
+  && productStatus.value === 'OFF_SHELF'
+  && !['USER', 'ACCOUNT_STATUS'].includes(offShelfBy.value)
+))
 const sellerAvatarText = computed(() => {
   const status = sellerSource.value?.accountStatus || sellerSource.value?.account_status || sellerSource.value?.status
   if (isBannedUserStatus(status) || isCanceledUserStatus(status)) return '停'
@@ -202,7 +238,7 @@ const actionText = computed(() => {
   if (readonlyMode.value) return '仅可查看'
   if (isOwnProduct.value) return '自己的商品'
   if (currentUserRestricted.value) return '账号受限'
-  return product.value?.status === 'ON_SALE' ? '提交预约' : statusText.value
+  return productStatus.value === 'ON_SALE' ? '提交预约' : statusText.value
 })
 
 const detailCacheKey = (id) => `${adminView.value ? 'admin-product-detail-cache' : 'product-detail-cache'}-${id}`
@@ -281,6 +317,30 @@ function adminRelatedPayload() {
   return payload
 }
 
+function askAdminOffShelfReason() {
+  return new Promise((resolve) => {
+    uni.showModal({
+      title: '填写下架原因',
+      editable: true,
+      placeholderText: '例如：商品信息违规、图片不实、交易风险等',
+      success: ({ confirm, content }) => {
+        if (!confirm) {
+          resolve('')
+          return
+        }
+        const reason = String(content || '').trim()
+        if (!reason) {
+          toast('请填写下架原因')
+          resolve('')
+          return
+        }
+        resolve(reason)
+      },
+      fail: () => resolve('')
+    })
+  })
+}
+
 function changeAdminProductStatus(status) {
   if (!adminView.value || !product.value?.id) return
   const action = status === 'ON_SALE' ? '上架商品' : '下架商品'
@@ -290,7 +350,13 @@ function changeAdminProductStatus(status) {
     success: async (res) => {
       if (!res.confirm) return
       try {
-        await updateAdminProductStatus(product.value.id, status, adminRelatedPayload())
+        const payload = adminRelatedPayload()
+        if (status === 'OFF_SHELF') {
+          const reason = await askAdminOffShelfReason()
+          if (!reason) return
+          payload.reason = reason
+        }
+        await updateAdminProductStatus(product.value.id, status, payload)
         product.value = { ...product.value, status }
         cacheProductDetail(product.value.id, product.value)
         toast(status === 'ON_SALE' ? '已上架' : '已下架', 'success')
@@ -309,6 +375,14 @@ function markImageFailed(image) {
   if (!failedImages.value.includes(image)) failedImages.value = failedImages.value.concat(image)
 }
 
+function markSellerAvatarFailed() {
+  const url = sellerAvatarUrl.value
+  if (url && !failedSellerAvatars.value.includes(url)) {
+    failedSellerAvatars.value = failedSellerAvatars.value.concat(url)
+  }
+  sellerAvatarFile.value = ''
+}
+
 function localizeHttpImage(url) {
   if (!/^http:\/\//.test(url || '')) return Promise.resolve(url || '')
   return new Promise((resolve) => {
@@ -324,9 +398,21 @@ async function loadSellerProfile() {
   if (!sellerId.value) return
   try {
     const profile = await getPublicProfile(sellerId.value)
-    const avatar = normalizeImage(pick(profile?.avatarUrl, profile?.avatar, profile?.avatar_url))
+    const publicProfile = profile?.profile || profile?.user || profile || {}
+    const fallback = product.value?.seller || product.value || {}
+    const avatar = normalizeImage(pick(
+      publicProfile?.avatarUrl,
+      publicProfile?.avatar,
+      publicProfile?.avatar_url,
+      fallback?.avatarUrl,
+      fallback?.avatar,
+      fallback?.avatar_url,
+      product.value?.sellerAvatarUrl,
+      product.value?.seller_avatar_url
+    ))
     sellerAvatarFile.value = await localizeHttpImage(avatar)
     sellerProfile.value = profile
+    failedSellerAvatars.value = []
     if (!adminView.value && isBannedUserStatus(accountStatusOf(profile?.user || profile))) {
       bannedSellerBlocked.value = true
     }
@@ -378,6 +464,16 @@ function report() {
   navigate('/pages/interaction/report', { targetType: 'PRODUCT', targetId: product.value.id })
 }
 
+function appealProductOffShelf() {
+  if (!ensureVerified() || !product.value?.id) return
+  if (!canAppealProductOffShelf.value) return
+  navigate('/pages/interaction/appeal', {
+    targetType: 'PRODUCT',
+    targetId: product.value.id,
+    lockTarget: 1
+  })
+}
+
 function openSeller() {
   if (!sellerId.value) return
   navigate('/pages/user-profile/user-profile', {
@@ -411,7 +507,7 @@ async function chat() {
 
 async function loadChatEligibility(productId) {
   isReservedBuyer.value = false
-  if (!productId || product.value?.status !== 'LOCKED' || !getToken()) return
+  if (!productId || productStatus.value !== 'LOCKED' || !getToken()) return
   try {
     const result = await listMyOrders({ role: 'buyer', pageSize: 100 })
     const list = Array.isArray(result) ? result : (result?.items || result?.list || [])
@@ -588,12 +684,14 @@ onLoad(async (options) => {
 .readonly-tip { margin: 20rpx; padding: 20rpx 24rpx; border-radius: 16rpx; background: #fff7e6; color: #a15c00; font-size: 26rpx; }
 .bottom { position: fixed; right: 0; bottom: 0; left: 0; display: flex; gap: 12rpx; padding: 16rpx 20rpx calc(16rpx + env(safe-area-inset-bottom)); background: #fff; }
 .bottom.admin { padding: 18rpx 24rpx calc(18rpx + env(safe-area-inset-bottom)); }
-.icon-button, .chat, .primary { height: 74rpx; border-radius: 999rpx; font-size: 26rpx; line-height: 74rpx; }
+.icon-button, .chat, .primary, .appeal-action { height: 74rpx; border-radius: 999rpx; font-size: 26rpx; line-height: 74rpx; }
 .icon-button { width: 84rpx; padding: 0; color: #4b5a52; background: #f2f5f3; }
 .favorite.active { color: #f59e0b; background: #fff7e6; }
 .report.disabled { color: #c3cac6; }
 .chat { flex: 1; color: #23734f; background: #e7f4ec; }
 .primary { flex: 1.4; color: #fff; background: #23734f; }
+.primary.disabled { color: #667085; background: #eef2f6; }
+.appeal-action { flex: 1.4; color: #a96500; background: #fff7e6; }
 .admin-action { width: 100%; height: 80rpx; border-radius: 16rpx; font-size: 28rpx; font-weight: 700; line-height: 80rpx; }
 .admin-action.primary-admin { color: #fff; background: #23734f; }
 .admin-action.danger { color: #ef4444; background: #fee2e2; }

@@ -40,6 +40,7 @@ type Service struct {
 
 type ProductLifecycle interface {
 	OffShelfOnSaleBySellerTx(ctx context.Context, tx *sql.Tx, sellerID uint64, reason string) ([]uint64, error)
+	OffShelfOnSaleBySellerWithSourceTx(ctx context.Context, tx *sql.Tx, sellerID uint64, reason string, source string) ([]uint64, error)
 }
 
 type OrderLifecycle interface {

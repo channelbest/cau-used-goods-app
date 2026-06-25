@@ -107,7 +107,7 @@ func main() {
 	statsService := stats.NewService(statsRepo)
 	statsHandler := stats.NewHandler(statsService)
 
-	aiService := ai.NewService(cfg.AI.APIKey)
+	aiService := ai.NewService(cfg.AI.APIKey, cfg.AI.BaseURL, cfg.AI.Model)
 	aiHandler := ai.NewHandler(aiService)
 
 	r := gin.Default()

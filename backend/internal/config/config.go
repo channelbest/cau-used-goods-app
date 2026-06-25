@@ -32,7 +32,9 @@ type WechatConfig struct {
 }
 
 type AIConfig struct {
-	APIKey string `yaml:"api_key"`
+	APIKey  string `yaml:"api_key"`
+	BaseURL string `yaml:"base_url"`
+	Model   string `yaml:"model"`
 }
 
 type DatabaseConfig struct {
@@ -101,6 +103,12 @@ func (c *Config) setDefaults() {
 	}
 	if c.Database.ConnMaxLifetimeMinutes == 0 {
 		c.Database.ConnMaxLifetimeMinutes = 30
+	}
+	if c.AI.BaseURL == "" {
+		c.AI.BaseURL = "https://open.bigmodel.cn/api/paas/v4"
+	}
+	if c.AI.Model == "" {
+		c.AI.Model = "glm-4-flash"
 	}
 }
 

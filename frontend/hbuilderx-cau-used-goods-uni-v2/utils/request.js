@@ -1,7 +1,7 @@
 import { getToken, clearAuth } from './auth'
 
-export const BASE_URL = 'http://62.234.163.176:7001'
-// export const BASE_URL = 'http://127.0.0.1:8080'
+//export const BASE_URL = 'http://62.234.163.176:7001'
+export const BASE_URL = 'http://127.0.0.1:8080'
 
 export const normalizeErrorMessage = (message, fallback = '请求失败，请稍后重试') => {
   const value = String(message || '').trim()
@@ -14,6 +14,7 @@ export const normalizeErrorMessage = (message, fallback = '请求失败，请稍
   if (lower.includes('appeal cannot be closed')) return '该申诉当前状态不能撤回'
   if (lower.includes('appeal already handled')) return '该申诉已处理，不能重复操作'
   if (lower.includes('appeal must be marked processing')) return '请先将申诉标记为处理中'
+  if (lower.includes('report result can only be appealed after handled')) return '举报处理完成后才能申诉处理结果'
   if (lower.includes('user appeal target must be restored before approval')) return '账号解封申诉需先恢复账号，再标记为通过'
   if (lower.includes('not found')) return '未找到相关数据'
   if (lower.includes('already reviewed')) return '该订单已经评价过'

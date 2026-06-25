@@ -55,12 +55,39 @@ const load = async () => {
   }
 }
 
+const askOffShelfReason = () => new Promise((resolve) => {
+  uni.showModal({
+    title: '填写下架原因',
+    editable: true,
+    placeholderText: '例如：商品信息违规、图片不实、交易风险等',
+    success: ({ confirm, content }) => {
+      if (!confirm) {
+        resolve('')
+        return
+      }
+      const reason = String(content || '').trim()
+      if (!reason) {
+        uni.showToast({ title: '请填写下架原因', icon: 'none' })
+        resolve('')
+        return
+      }
+      resolve(reason)
+    },
+    fail: () => resolve('')
+  })
+})
+
 const changeStatus = async (status) => {
   try {
     const extra = {}
     if (relatedType.value && relatedId.value) {
       extra.relatedType = relatedType.value
       extra.relatedId = relatedId.value
+    }
+    if (status === 'OFF_SHELF') {
+      const reason = await askOffShelfReason()
+      if (!reason) return
+      extra.reason = reason
     }
     await updateAdminProductStatus(productId.value, status, extra)
     uni.showToast({ title: status === 'ON_SALE' ? '已上架' : '已下架', icon: 'success' })

@@ -43,6 +43,15 @@ func (s *Service) Create(ctx context.Context, input CreateAppealInput) (*Appeal,
 	if !allowed {
 		return nil, fmt.Errorf("permission denied")
 	}
+	if input.TargetType == TargetTypeReport {
+		appealable, err := s.repo.ReportResultAppealable(ctx, input.TargetID)
+		if err != nil {
+			return nil, err
+		}
+		if !appealable {
+			return nil, fmt.Errorf("report result can only be appealed after handled")
+		}
+	}
 	active, err := s.repo.HasActiveAppeal(ctx, input.AppellantID, input.TargetType, input.TargetID)
 	if err != nil {
 		return nil, err

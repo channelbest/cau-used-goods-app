@@ -12,7 +12,7 @@ BEGIN
       AND COLUMN_NAME = 'off_shelf_by'
   ) THEN
     ALTER TABLE `products`
-      ADD COLUMN `off_shelf_by` VARCHAR(20) NULL COMMENT '下架来源：USER / ADMIN / SYSTEM'
+      ADD COLUMN `off_shelf_by` VARCHAR(20) NULL COMMENT '下架来源：USER / ADMIN / SYSTEM / ACCOUNT_STATUS'
       AFTER `off_shelf_reason`;
   END IF;
 END//

@@ -34,6 +34,11 @@ export const updateProductStatus = (id, status, reason = '') => request({
   data: { status, reason }
 })
 
+export const batchPutOnSaleProducts = () => request({
+  url: '/products/batch-on-sale',
+  method: 'POST'
+})
+
 export const deleteProduct = (id) => request({
   url: `/products/${id}`,
   method: 'DELETE'

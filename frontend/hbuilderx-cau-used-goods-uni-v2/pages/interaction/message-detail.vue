@@ -136,6 +136,9 @@
         </view>
         <text class="arrow">›</text>
       </view>
+      <view v-if="canAppealReportResult" class="auth-actions">
+        <button class="btn primary" @click="goReportAppeal">申诉举报处理结果</button>
+      </view>
     </view>
 
     <template v-else>
@@ -279,6 +282,10 @@ const reportApproved = computed(() => {
   const status = String(reportDetail.value?.status || '').toUpperCase()
   if (status) return status === 'APPROVED'
   return String(message.value?.content || '').includes('APPROVED')
+})
+const canAppealReportResult = computed(() => {
+  const status = String(reportDetail.value?.status || '').toUpperCase()
+  return status === 'APPROVED' || status === 'REJECTED'
 })
 const reportTargetText = computed(() => formatProcessedTarget(reportDetail.value))
 const reportHandleResult = computed(() => {
@@ -584,6 +591,12 @@ function goProductAppeal() {
     || message.value?.product?.id
     || message.value?.relatedProduct?.id
   navigate('/pages/interaction/appeal', { targetType: 'PRODUCT', targetId })
+}
+
+function goReportAppeal() {
+  const targetId = reportDetail.value?.id || message.value?.targetId || message.value?.relatedId
+  if (!targetId) return
+  navigate('/pages/interaction/appeal', { targetType: 'REPORT', targetId })
 }
 </script>
 

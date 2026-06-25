@@ -327,7 +327,7 @@ const isUserAppeal = (item) => activeMode.value === 'APPEAL' && item?.targetType
 
 const userAppealRiskText = (item) => {
   const status = normalizeStatus(item?.status)
-  if (status === 'PENDING' || status === 'PROCESSING') return '需超管'
+  if (status === 'PENDING' || status === 'PROCESSING') return '谨慎操作' 
   return '账号解封'
 }
 

@@ -113,7 +113,7 @@ CALL `add_column_if_missing`(
 CALL `add_column_if_missing`(
   'products',
   'off_shelf_by',
-  'VARCHAR(20) NULL COMMENT ''下架来源：USER / ADMIN / SYSTEM''',
+  'VARCHAR(20) NULL COMMENT ''下架来源：USER / ADMIN / SYSTEM / ACCOUNT_STATUS''',
   'off_shelf_reason'
 );
 

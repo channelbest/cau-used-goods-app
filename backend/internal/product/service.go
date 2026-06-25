@@ -297,6 +297,13 @@ func (s *Service) UpdateProductStatus(ctx context.Context, productID uint64, sel
 	return s.repo.UpdateProductStatus(ctx, productID, sellerID, status, reason)
 }
 
+func (s *Service) BatchPutOnSaleRestorable(ctx context.Context, sellerID uint64) (int64, error) {
+	if sellerID == 0 {
+		return 0, fmt.Errorf("user not login")
+	}
+	return s.repo.BatchPutOnSaleRestorable(ctx, sellerID)
+}
+
 type AdminUpdateProductStatusInput struct {
 	AdminID     uint64
 	ProductID   uint64
@@ -450,6 +457,10 @@ func relatedIDPtr(relatedID uint64) *uint64 {
 
 func (s *Service) OffShelfOnSaleBySellerTx(ctx context.Context, tx *sql.Tx, sellerID uint64, reason string) ([]uint64, error) {
 	return s.repo.OffShelfOnSaleBySellerTx(ctx, tx, sellerID, reason)
+}
+
+func (s *Service) OffShelfOnSaleBySellerWithSourceTx(ctx context.Context, tx *sql.Tx, sellerID uint64, reason string, source string) ([]uint64, error) {
+	return s.repo.OffShelfOnSaleBySellerWithSourceTx(ctx, tx, sellerID, reason, source)
 }
 
 type ProductImagesInput struct {

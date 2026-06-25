@@ -1,7 +1,7 @@
 <template>
   <view class="page">
     <view class="form-card">
-      <button class="profile-row avatar-picker" open-type="chooseAvatar" @chooseavatar="useWechatAvatar">
+      <button class="profile-row avatar-picker" :open-type="wechatAvatarOpenType" @chooseavatar="useWechatAvatar" @click="chooseAvatarFile">
         <text class="row-label">头像</text>
         <view class="row-value">
           <image v-if="avatarUrl" class="avatar" :src="avatarUrl" mode="aspectFill" />
@@ -30,14 +30,15 @@ import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getUser, setUser } from '../../utils/auth'
 import { updateProfile, uploadAvatar } from '../../api/auth'
+import { BASE_URL } from '../../utils/request'
 
-const BASE_URL = 'http://62.234.163.176:7001'
-// const BASE_URL = 'http://127.0.0.1:8080'
 const nickname = ref('')
 const phone = ref('')
 const avatarUrl = ref('')
 const loading = ref(false)
 const selectedAvatarPath = ref('')
+const canUseWechatAvatar = typeof uni.canIUse === 'function' && uni.canIUse('button.open-type.chooseAvatar')
+const wechatAvatarOpenType = canUseWechatAvatar ? 'chooseAvatar' : ''
 
 const normalizeAvatar = (url) => {
   if (!url) return ''
@@ -58,6 +59,21 @@ const useWechatAvatar = (event) => {
   if (!filePath) return
   selectedAvatarPath.value = filePath
   avatarUrl.value = filePath
+}
+
+const chooseAvatarFile = () => {
+  if (canUseWechatAvatar) return
+  uni.chooseImage({
+    count: 1,
+    sizeType: ['compressed'],
+    sourceType: ['album', 'camera'],
+    success: (res) => {
+      const filePath = res.tempFilePaths?.[0] || ''
+      if (!filePath) return
+      selectedAvatarPath.value = filePath
+      avatarUrl.value = filePath
+    }
+  })
 }
 
 const saveProfile = async () => {

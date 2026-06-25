@@ -127,7 +127,7 @@ export const updateAdminProductStatus = (productId, status, extra = {}) => {
     method: 'PUT',
     data: {
       status,
-      reason: status === 'ON_SALE' ? '管理员上架商品' : '管理员下架商品',
+      reason: status === 'ON_SALE' ? '管理员上架商品' : '',
       ...extra
     }
   })
@@ -159,9 +159,14 @@ export const getAdminAppealDetail = (appealId) => {
   return request({ url: `/admin/appeals/${appealId}` })
 }
 
-export const getAdminLogs = () => {
+export const getAdminLogs = (params = {}) => {
+  const query = toQuery({
+    page: 1,
+    pageSize: 50,
+    ...params
+  })
   return request({
-    url: '/admin/logs?page=1&pageSize=50'
+    url: `/admin/logs${query ? `?${query}` : ''}`
   })
 }
 

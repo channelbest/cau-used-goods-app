@@ -10,6 +10,7 @@ export const ORDER_STATUS = {
 export const REPORT_STATUS = {
   PENDING: { label: '\u5f85\u5904\u7406', tone: 'warning' },
   PROCESSING: { label: '\u5904\u7406\u4e2d', tone: 'primary' },
+  APPROVED: { label: '\u5df2\u901a\u8fc7', tone: 'success' },
   RESOLVED: { label: '\u5df2\u5904\u7406', tone: 'success' },
   REJECTED: { label: '\u5df2\u9a73\u56de', tone: 'muted' },
   CLOSED: { label: '\u5df2\u5173\u95ed', tone: 'muted' }

@@ -1,19 +1,20 @@
 <template>
   <view class="page">
-    <scroll-view class="filter-row" scroll-x enhanced :show-scrollbar="false">
+    <view class="filter-row">
       <view class="filter-inner">
         <view
           v-for="item in logFilters"
           :key="item.value"
           :class="['filter-chip', activeFilter === item.value ? 'active' : '']"
+          hover-class="filter-chip-pressed"
           @tap.stop="selectFilter(item.value)"
         >
           {{ item.label }} {{ countByFilter(item.value) }}
         </view>
       </view>
-    </scroll-view>
+    </view>
 
-    <view v-if="filteredLogs.length === 0" class="empty">暂无日志</view>
+    <view v-if="filteredLogs.length === 0" class="empty">{{ loading ? '日志加载中...' : '暂无日志' }}</view>
     <view v-for="log in filteredLogs" :key="log.id" class="log-item" @click="showLogDetail(log)">
       <view class="log-main">
         <view>
@@ -40,14 +41,15 @@
           </view>
           <view class="detail-row">
             <text class="detail-label">操作人</text>
-            <view class="detail-value">
-              <image v-if="currentLog.adminAvatar" class="admin-avatar" :src="currentLog.adminAvatar" mode="aspectFill" />
-              <text>{{ currentLog.adminName || `管理员 #${currentLog.adminId}` }}</text>
+            <view class="detail-value admin-value">
+              <image v-if="adminAvatarUrl(currentLog)" class="admin-avatar" :src="adminAvatarUrl(currentLog)" mode="aspectFill" />
+              <view v-else class="admin-avatar admin-avatar-placeholder">{{ adminAvatarText(currentLog) }}</view>
+              <text>{{ adminDisplayText(currentLog) }}</text>
             </view>
           </view>
           <view class="detail-row">
             <text class="detail-label">操作对象</text>
-            <text class="detail-value">{{ targetDetail || `${targetLabelMap[currentLog.targetType] || currentLog.targetType} #${currentLog.targetId}` }}</text>
+            <text class="detail-value">{{ operationTargetText(currentLog) }}</text>
           </view>
           <view v-if="currentLog.targetType === 'USER' && currentLog.targetName" class="detail-row">
             <text class="detail-label">被操作者</text>
@@ -78,14 +80,17 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { getAdminLogs, getAdminLogDetail, getAdminUserDetail, getAdminReportDetail, getAdminAppealDetail } from '../../api/admin'
+import { getAdminLogs, getAdminUserDetail, getAdminReportDetail, getAdminAppealDetail } from '../../api/admin'
 import { getProductById } from '../../api/product'
+import { BASE_URL } from '../../utils/request'
 
-const logs = ref([])
+const allLogs = ref([])
 const activeFilter = ref('ALL')
+const loading = ref(false)
 const detailVisible = ref(false)
 const currentLog = ref(null)
 const targetDetail = ref('')
+let requestSeq = 0
 
 const logFilters = [
   { label: '全部', value: 'ALL' },
@@ -167,6 +172,43 @@ const targetLabelMap = {
   ORDER: '订单'
 }
 
+const normalizeImage = (value) => {
+  const url = String(value || '').trim()
+  if (!url) return ''
+  if (/^https?:\/\//.test(url)) return url
+  if (url.startsWith('/uploads/')) return `${BASE_URL}${url}`
+  if (url.startsWith('uploads/')) return `${BASE_URL}/${url}`
+  return url
+}
+
+const adminAvatarUrl = (log) => normalizeImage(log?.adminAvatar)
+
+const adminAvatarText = (log) => {
+  const name = String(log?.adminName || '').trim()
+  return (name || '管').slice(0, 1)
+}
+
+const adminDisplayText = (log) => {
+  const idText = log?.adminId ? `ID: ${log.adminId}` : 'ID: 未知'
+  const name = String(log?.adminName || '').trim() || '管理员'
+  return `${name}（${idText}）`
+}
+
+const operationTargetText = (log) => {
+  if (!log) return ''
+  const label = targetLabelMap[log.targetType] || log.targetType || '对象'
+  return log.targetId ? `${label} #${log.targetId}` : label
+}
+
+const announcementStatusDescription = (status) => {
+  const value = String(status || '').trim()
+  const label = translateStatus(value)
+  if (value === 'PUBLISHED') return '公告已发布'
+  if (value === 'OFFLINE') return '公告已下线'
+  if (value === 'DRAFT') return '公告已转为草稿'
+  return label ? `公告状态更新为${label}` : '公告状态已更新'
+}
+
 const descriptionMap = [
   [/^update announcement status:\s*(.+)$/i, (_, status) => announcementStatusDescription(status)],
   [/^create announcement:\s*(.+)$/i, (_, title) => `新增公告：${title}`],
@@ -192,25 +234,36 @@ const logCategory = (log) => {
 }
 
 const filteredLogs = computed(() => {
-  if (activeFilter.value === 'ALL') return logs.value
-  return logs.value.filter((log) => logCategory(log) === activeFilter.value)
+  if (activeFilter.value === 'ALL') return allLogs.value
+  return allLogs.value.filter((log) => logCategory(log) === activeFilter.value)
 })
 
 const countByFilter = (value) => {
-  if (value === 'ALL') return logs.value.length
-  return logs.value.filter((log) => logCategory(log) === value).length
+  if (value === 'ALL') return allLogs.value.length
+  return allLogs.value.filter((log) => logCategory(log) === value).length
 }
 
 const selectFilter = (value) => {
+  if (activeFilter.value === value) return
   activeFilter.value = value
 }
 
+const normalizeLogItems = (result) => {
+  return result?.items || result?.data?.items || []
+}
+
 const load = async () => {
+  const seq = ++requestSeq
+  loading.value = true
   try {
-    const result = await getAdminLogs()
-    logs.value = result?.items || []
+    const result = await getAdminLogs({ page: 1, pageSize: 100 })
+    if (seq !== requestSeq) return
+    const items = normalizeLogItems(result)
+    allLogs.value = items
   } catch (error) {
     uni.showToast({ title: error.message || '日志加载失败', icon: 'none' })
+  } finally {
+    if (seq === requestSeq) loading.value = false
   }
 }
 
@@ -409,7 +462,7 @@ const formatDateTime = (value) => {
   return String(value).replace('T', ' ').replace(/\+\d{2}:\d{2}$/, '')
 }
 
-onShow(load)
+onShow(() => load())
 </script>
 
 <style scoped>
@@ -423,22 +476,28 @@ onShow(load)
 .filter-row {
   width: 100%;
   margin: 4rpx 0 22rpx;
-  white-space: nowrap;
 }
 
 .filter-inner {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   gap: 14rpx;
-  min-width: 100%;
 }
 
 .filter-chip {
-  flex-shrink: 0;
-  padding: 14rpx 22rpx;
+  display: flex;
+  align-items: center;
+  min-height: 72rpx;
+  padding: 14rpx 24rpx;
+  box-sizing: border-box;
   border-radius: 999rpx;
   background: #fff;
   color: #667085;
   font-size: 26rpx;
+}
+
+.filter-chip-pressed {
+  opacity: 0.72;
 }
 
 .filter-chip.active {
@@ -566,10 +625,25 @@ onShow(load)
   gap: 12rpx;
 }
 
+.admin-value {
+  min-width: 0;
+}
+
 .admin-avatar {
   width: 48rpx;
   height: 48rpx;
+  flex-shrink: 0;
   border-radius: 50%;
   background: #e8ecef;
+}
+
+.admin-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #207f55;
+  font-size: 22rpx;
+  font-weight: 700;
+  background: #e7f6ee;
 }
 </style>

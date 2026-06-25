@@ -275,6 +275,21 @@ PUT /admin/products/:id/status
 - 请求体可传 `relatedType=APPEAL`、`relatedId=申诉ID`，让商品状态日志关联该申诉。
 - 已删除商品是否恢复仍由商品状态接口规则决定。
 
+商品申诉入口补充：
+
+- 卖家本人打开已下架商品详情时，如果该商品不能自行恢复上架，会显示“申诉下架”入口。
+- 不能自行恢复的典型来源包括 `off_shelf_by = ADMIN` 和普通 `SYSTEM`。
+- `off_shelf_by = USER` 或 `ACCOUNT_STATUS` 的商品不走该入口，用户可在“我的商品”中单个上架或一键上架。
+- 从商品详情进入申诉页时，前端固定传入：
+
+```text
+targetType = PRODUCT
+targetId = 当前商品 ID
+lockTarget = 1
+```
+
+- 申诉页收到 `lockTarget=1` 后，申诉对象和对象 ID 不允许修改，避免用户将入口申诉改成其他目标。
+
 ### 5.2 账号申诉通过
 
 ```text

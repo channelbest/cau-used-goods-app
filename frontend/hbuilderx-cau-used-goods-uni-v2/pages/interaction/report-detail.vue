@@ -12,7 +12,8 @@
         <text class="desc">{{ report.detail || '未填写补充说明' }}</text>
       </view>
       <view v-if="report.result" class="result">处理结果：{{ report.result }}</view>
-      <button class="appeal-button" @click="appealReport">申诉举报处理结果</button>
+      <button v-if="canAppealReport" class="appeal-button" @click="appealReport">申诉举报处理结果</button>
+      <view v-else-if="reportAppealHint" class="appeal-hint">{{ reportAppealHint }}</view>
     </view>
 
     <view v-if="target" class="card">
@@ -48,7 +49,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import StatusBadge from '../../components/StatusBadge.vue'
 import { getPublicProfile } from '../../api/user'
@@ -60,6 +61,16 @@ import { navigate, showError } from '../../utils/navigation'
 const report = ref(null)
 const target = ref(null)
 const targetTitle = ref('关联详情')
+const canAppealReport = computed(() => {
+  const value = String(report.value?.status || '').toUpperCase()
+  return value === 'APPROVED' || value === 'REJECTED'
+})
+// const reportAppealHint = computed(() => {
+//   const value = String(report.value?.status || '').toUpperCase()
+//   if (value === 'PENDING' || value === 'PROCESSING') return '举报处理完成后可申诉处理结果'
+//   if (value === 'CLOSED') return '举报已关闭，暂无处理结果可申诉'
+//   return ''
+// })
 
 function status(value) {
   return REPORT_STATUS[value] || { label: value, tone: 'muted' }
@@ -127,6 +138,7 @@ function appealReport() {
 .desc { color: #59675f; font-size: 26rpx; line-height: 1.7; }
 .result { margin-top: 20rpx; padding: 18rpx; border-radius: 14rpx; color: #2f6b4f; background: #edf6f1; font-size: 25rpx; line-height: 1.5; }
 .appeal-button { margin-top: 22rpx; height: 76rpx; border-radius: 999rpx; background: #fff7e6; color: #a96500; font-size: 27rpx; line-height: 76rpx; }
+.appeal-hint { margin-top: 22rpx; padding: 18rpx 22rpx; border-radius: 18rpx; background: #f8faf9; color: #8a948f; font-size: 25rpx; line-height: 1.5; text-align: center; }
 .product, .user { display: flex; gap: 18rpx; align-items: center; }
 .cover { width: 150rpx; height: 122rpx; flex: 0 0 150rpx; border-radius: 16rpx; background: #edf2ef; }
 .placeholder { display: flex; align-items: center; justify-content: center; color: #9aa5a1; font-size: 23rpx; }

@@ -117,7 +117,7 @@
           </view>
         </view>
         <view v-if="!productTrend.length" class="empty">暂无趋势数据</view>
-        <view class="trend-note">成交趋势需后端新增按日期统计后接入</view>
+        <view class="trend-note">成交为当日发布商品中已售出的数量</view>
       </view>
 
       <view class="section-title category-title">
@@ -286,6 +286,48 @@ const adminCategories = ref([])
 const selectedPrimaryId = ref('')
 const productTrend = ref([])
 
+const firstValue = (values) => {
+  for (const value of values) {
+    if (value !== undefined && value !== null && value !== '') return value
+  }
+  return 0
+}
+
+const toNumber = (value) => {
+  const num = Number(value || 0)
+  return Number.isFinite(num) ? num : 0
+}
+
+const trendPublishCount = (item) => {
+  return toNumber(firstValue([item?.count, item?.publishCount, item?.publish_count]))
+}
+
+const trendCompletedCount = (item) => {
+  return toNumber(firstValue([item?.completed_count,item?.completedCount]))
+}
+
+const trendItems = (result) => {
+  if (Array.isArray(result)) return result
+  if (Array.isArray(result?.list)) return result.list
+  if (Array.isArray(result?.items)) return result.items
+  if (Array.isArray(result?.data)) return result.data
+  if (Array.isArray(result?.data?.list)) return result.data.list
+  if (Array.isArray(result?.data?.items)) return result.data.items
+  return []
+}
+
+const normalizeProductTrend = (result) => {
+  return trendItems(result).map((raw) => {
+    const item = raw || {}
+    return {
+      ...item,
+      date: firstValue([item?.date, item?.trendDate, item?.trend_date]),
+      count: trendPublishCount(item),
+      completedCount: trendCompletedCount(item)
+    }
+  })
+}
+
 const riskTodoCount = computed(() => {
   return Number(reportOverview.value.pendingReports || 0) + Number(appealOverview.value.pendingAppeals || 0)
 })
@@ -411,7 +453,7 @@ const loadAdminData = async () => {
     appealOverview.value = appealStats || {}
     categoryDistribution.value = categories?.list || categories || []
     adminCategories.value = categoryTree || []
-    productTrend.value = trend?.list || trend || []
+    productTrend.value = normalizeProductTrend(trend)
   } catch (error) {
     uni.showToast({ title: error.message || '后台数据加载失败', icon: 'none' })
   }
