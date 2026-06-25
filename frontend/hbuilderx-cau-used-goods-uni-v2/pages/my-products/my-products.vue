@@ -5,7 +5,10 @@
         <view class="title">我发布的</view>
         <view class="muted">管理自己的闲置商品</view>
       </view>
-      <button class="publish" @click="goPublish">发布</button>
+      <view class="summary-actions">
+        <button v-if="canBatchPutOnSale" class="batch-on-sale" @click="batchPutOnSale">一键上架</button>
+        <button class="publish" @click="goPublish">发布</button>
+      </view>
     </view>
 
     <view v-if="products.length" class="list">
@@ -16,14 +19,15 @@
           <view class="content">
             <view class="top">
               <view class="name">{{ item.title }}</view>
-              <text class="status" :class="item.status">{{ getStatusText(item.status) }}</text>
+              <text class="status" :class="productStatus(item)">{{ getStatusText(productStatus(item)) }}</text>
             </view>
             <view class="meta">{{ item.category }} · {{ item.conditionText }}</view>
+            <view v-if="offShelfReason(item)" class="off-shelf-reason">下架原因：{{ offShelfReason(item) }}</view>
             <text class="price">￥{{ item.priceText }}</text>
           </view>
         </view>
         <view v-if="canEdit(item)" class="actions">
-          <button v-if="item.status === 'ON_SALE'" class="action muted-action" @click="changeStatus(item, 'OFF_SHELF')">下架</button>
+          <button v-if="productStatus(item) === 'ON_SALE'" class="action muted-action" @click="changeStatus(item, 'OFF_SHELF')">下架</button>
           <button v-if="canPutOnSale(item)" class="action primary-action" @click="changeStatus(item, 'ON_SALE')">上架</button>
           <text v-else-if="offShelfTip(item)" class="off-shelf-tip">{{ offShelfTip(item) }}</text>
           <button v-if="canEdit(item)" class="action" @click="editProduct(item)">编辑</button>
@@ -44,7 +48,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
-import { deleteProduct, listCategories, listMyProducts, updateProductStatus } from '../../api/product'
+import { batchPutOnSaleProducts, deleteProduct, listCategories, listMyProducts, updateProductStatus } from '../../api/product'
 import { getCurrentUser } from '../../api/auth'
 import { getUser, setUser } from '../../utils/auth'
 import { buildCategoryMap, formatProduct, getStatusText } from '../../utils/product-format'
@@ -54,6 +58,8 @@ const categories = ref([])
 const rawProducts = ref([])
 const loading = ref(false)
 const products = computed(() => rawProducts.value.map((item) => formatProduct(item, buildCategoryMap(categories.value))))
+const restorableOffShelfSources = ['USER', 'ACCOUNT_STATUS']
+const canBatchPutOnSale = computed(() => products.value.some((item) => canPutOnSale(item)))
 
 const loadData = async () => {
   loading.value = true
@@ -76,11 +82,14 @@ const goPublish = () => {
   uni.removeStorageSync('PUBLISH_EDIT_INTENT')
   uni.switchTab({ url: '/pages/publish/publish' })
 }
-const canEdit = (item) => ['ON_SALE', 'OFF_SHELF'].includes(item.status)
-const offShelfBy = (item) => String(item.offShelfBy || item.off_shelf_by || '').toUpperCase()
-const canPutOnSale = (item) => item.status === 'OFF_SHELF' && offShelfBy(item) === 'USER'
+const normalizeCode = (value) => String(value || '').trim().toUpperCase()
+const productStatus = (item) => normalizeCode(item.status || item.productStatus || item.product_status)
+const canEdit = (item) => ['ON_SALE', 'OFF_SHELF'].includes(productStatus(item))
+const offShelfBy = (item) => normalizeCode(item.offShelfBy || item.off_shelf_by)
+const offShelfReason = (item) => String(item.offShelfReason || item.off_shelf_reason || '').trim()
+const canPutOnSale = (item) => productStatus(item) === 'OFF_SHELF' && restorableOffShelfSources.includes(offShelfBy(item))
 const offShelfTip = (item) => {
-  if (item.status !== 'OFF_SHELF') return ''
+  if (productStatus(item) !== 'OFF_SHELF') return ''
   const source = offShelfBy(item)
   if (source === 'ADMIN') return '管理员已下架'
   if (source === 'SYSTEM') return '系统已下架'
@@ -130,7 +139,7 @@ const changeStatus = (item, status) => {
   const title = status === 'ON_SALE' ? '确认重新上架？' : '确认下架商品？'
   uni.showModal({
     title,
-    content: status === 'ON_SALE' ? '上架后买家可以继续预约。' : '下架后买家暂时看不到该商品。',
+    content: status === 'ON_SALE' ? '商品上架后将重新公开展示，请确认商品无违规、物品仍可正常交易。' : '下架后买家暂时看不到该商品。',
     success: async ({ confirm }) => {
       if (!confirm) return
       try {
@@ -140,6 +149,25 @@ const changeStatus = (item, status) => {
         await loadData()
       } catch (error) {
         uni.showToast({ title: normalizeStatusError(error, status), icon: 'none' })
+      }
+    }
+  })
+}
+
+const batchPutOnSale = () => {
+  uni.showModal({
+    title: '确认一键上架？',
+    content: '商品上架后将重新公开展示，请确认商品无违规、物品仍可正常交易。',
+    success: async ({ confirm }) => {
+      if (!confirm) return
+      try {
+        if (!(await ensureCanPutOnSale())) return
+        const result = await batchPutOnSaleProducts()
+        const count = Number(result?.count || 0)
+        uni.showToast({ title: count > 0 ? `已上架${count}件商品` : '暂无可上架商品', icon: count > 0 ? 'success' : 'none' })
+        await loadData()
+      } catch (error) {
+        uni.showToast({ title: normalizeStatusError(error, 'ON_SALE'), icon: 'none' })
       }
     }
   })
@@ -171,8 +199,11 @@ onPullDownRefresh(loadData)
 .summary { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24rpx; padding: 28rpx; border-radius: 26rpx; background: #fff; box-shadow: 0 8rpx 24rpx rgba(28, 68, 52, .05); }
 .title { color: #26342f; font-size: 38rpx; font-weight: 700; }
 .muted, .load-state { color: #929c98; font-size: 23rpx; }
-.publish, .empty-button { height: 66rpx; border-radius: 999rpx; background: #23734f; color: #fff; font-size: 26rpx; line-height: 66rpx; }
-.publish { width: 128rpx; margin: 0 0 0 auto; flex-shrink: 0; }
+.summary-actions { display: flex; flex-shrink: 0; align-items: center; gap: 12rpx; margin-left: auto; }
+.publish, .empty-button, .batch-on-sale { height: 66rpx; border-radius: 999rpx; font-size: 26rpx; line-height: 66rpx; }
+.publish, .empty-button { background: #23734f; color: #fff; }
+.publish { width: 128rpx; margin: 0; flex-shrink: 0; }
+.batch-on-sale { min-width: 160rpx; padding: 0 20rpx; background: #fff7e6; color: #a96500; }
 .list { display: flex; flex-direction: column; gap: 22rpx; }
 .product { display: flex; flex-direction: column; gap: 18rpx; padding: 22rpx; border-radius: 24rpx; background: #fff; box-shadow: 0 8rpx 24rpx rgba(28, 68, 52, .05); }
 .product-main { display: flex; min-width: 0; }
@@ -186,6 +217,7 @@ onPullDownRefresh(loadData)
 .status.LOCKED { background: #fff2d8; color: #9a6a1d; }
 .status.OFF_SHELF { background: #eef0f0; color: #7a817e; }
 .meta { color: #89938f; font-size: 23rpx; }
+.off-shelf-reason { overflow: hidden; color: #8a6a35; font-size: 23rpx; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .price { color: #e36a3e; font-size: 34rpx; font-weight: 700; }
 .actions { justify-content: flex-end; gap: 12rpx; padding-top: 16rpx; border-top: 1rpx solid #edf2ef; }
 .action { min-width: 104rpx; height: 58rpx; padding: 0 18rpx; border-radius: 999rpx; background: #edf4f1; color: #23734f; font-size: 24rpx; line-height: 58rpx; }

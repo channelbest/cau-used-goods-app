@@ -123,13 +123,13 @@ const targetOrder = computed(() => item.value?.targetType === 'ORDER' ? order.va
 const isUserAppeal = computed(() => mode.value === 'APPEAL' && item.value?.targetType === 'USER')
 const userAppealRiskText = computed(() => {
   const status = normalizeStatus(item.value?.status)
-  if (status === 'PENDING' || status === 'PROCESSING') return '需超管'
+  if (status === 'PENDING' || status === 'PROCESSING') return '谨慎操作'
   return '账号解封'
 })
 const productInfoTitle = computed(() => targetProduct.value?.title || `商品 #${item.value?.targetId || ''}`)
 const productInfoPrice = computed(() => targetProduct.value?.price ?? 0)
 const productInfoStatus = computed(() => productStatusText(targetProduct.value?.status))
-const targetEntryVisible = computed(() => ['USER', 'PRODUCT', 'ORDER'].includes(item.value?.targetType) || Boolean(targetManageUrl.value))
+const targetEntryVisible = computed(() => ['USER', 'PRODUCT', 'ORDER', 'REPORT'].includes(item.value?.targetType) || Boolean(targetManageUrl.value))
 const targetUserAvatar = computed(() => item.value?.targetType === 'USER' ? normalizeImage(targetUser.value?.avatarUrl || targetUser.value?.avatar || targetUser.value?.avatar_url || '') : '')
 const targetUserName = computed(() => targetUser.value?.nickname || targetUser.value?.realName || targetUser.value?.real_name || '')
 const targetEntryImage = computed(() => {
@@ -146,6 +146,7 @@ const targetEntryTitle = computed(() => {
   if (item.value?.targetType === 'USER') return '查看用户主页'
   if (item.value?.targetType === 'PRODUCT') return '查看商品详情'
   if (item.value?.targetType === 'ORDER') return '查看订单详情'
+  if (item.value?.targetType === 'REPORT') return '查看举报详情'
   return `查看${targetText(item.value?.targetType)}管理`
 })
 const targetEntryMeta = computed(() => {
@@ -158,6 +159,7 @@ const targetEntryMeta = computed(() => {
     const productTitle = source.productTitleSnapshot || source.productTitle || source.product?.title || source.targetTitle || '订单商品'
     return `${buyerName} · ${productTitle}`
   }
+  if (item.value?.targetType === 'REPORT') return `举报 #${item.value?.targetId}`
   return `${targetText(item.value?.targetType)} #${item.value?.targetId}`
 })
 const targetManageUrl = computed(() => {
@@ -337,6 +339,10 @@ const goTargetManage = () => {
   if (item.value?.targetType === 'ORDER' && item.value.targetId) {
     const url = orderDetailUrl(item.value.targetId)
     if (url) uni.navigateTo({ url })
+    return
+  }
+  if (item.value?.targetType === 'REPORT' && item.value.targetId) {
+    uni.navigateTo({ url: `/pages/admin-risk-detail/admin-risk-detail?mode=REPORT&id=${item.value.targetId}` })
     return
   }
   if (!targetManageUrl.value) return

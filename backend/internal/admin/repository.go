@@ -356,7 +356,7 @@ func (r *Repository) ListLogs(ctx context.Context, query LogQuery) ([]AdminLog, 
 	whereSQL, args := buildLogWhere(query)
 
 	var total int
-	countSQL := `SELECT COUNT(*) FROM admin_logs` + whereSQL
+	countSQL := `SELECT COUNT(*) FROM admin_logs l` + whereSQL
 	if err := r.db.QueryRowContext(ctx, countSQL, args...).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("count admin logs: %w", err)
 	}
@@ -475,27 +475,27 @@ func buildLogWhere(query LogQuery) (string, []interface{}) {
 	args := make([]interface{}, 0)
 
 	if query.AdminID > 0 {
-		whereSQL += " AND admin_id = ?"
+		whereSQL += " AND l.admin_id = ?"
 		args = append(args, query.AdminID)
 	}
 	if query.OperationType != "" {
-		whereSQL += " AND operation_type = ?"
+		whereSQL += " AND l.operation_type = ?"
 		args = append(args, query.OperationType)
 	}
 	if query.TargetType != "" {
-		whereSQL += " AND target_type = ?"
+		whereSQL += " AND l.target_type = ?"
 		args = append(args, query.TargetType)
 	}
 	if query.TargetID > 0 {
-		whereSQL += " AND target_id = ?"
+		whereSQL += " AND l.target_id = ?"
 		args = append(args, query.TargetID)
 	}
 	if query.StartTime != "" {
-		whereSQL += " AND create_time >= ?"
+		whereSQL += " AND l.create_time >= ?"
 		args = append(args, query.StartTime)
 	}
 	if query.EndTime != "" {
-		whereSQL += " AND create_time <= ?"
+		whereSQL += " AND l.create_time <= ?"
 		args = append(args, query.EndTime)
 	}
 

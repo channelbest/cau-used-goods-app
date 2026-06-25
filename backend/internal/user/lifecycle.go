@@ -95,7 +95,7 @@ func (r *Repository) ChangeAccountStatus(
 		if products == nil {
 			return nil, fmt.Errorf("商品状态协同服务不可用")
 		}
-		productIDs, err := products.OffShelfOnSaleBySellerTx(ctx, tx, input.UserID, input.Reason)
+		productIDs, err := products.OffShelfOnSaleBySellerWithSourceTx(ctx, tx, input.UserID, input.Reason, "ACCOUNT_STATUS")
 		if err != nil {
 			return nil, err
 		}

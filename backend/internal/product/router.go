@@ -30,6 +30,7 @@ func RegisterRoutes(r *gin.Engine, handler *Handler, authMiddleware, optionalAut
 	{
 		products.POST("", verifiedMiddleware, handler.CreateProduct)
 		products.GET("/my", handler.ListMyProducts)
+		products.POST("/batch-on-sale", verifiedMiddleware, handler.BatchPutOnSaleRestorable)
 		products.PUT("/:id", verifiedMiddleware, handler.UpdateProduct)
 		products.PUT("/:id/status", verifiedMiddleware, handler.UpdateProductStatus)
 		products.POST("/:id/images", verifiedMiddleware, handler.AddProductImages)

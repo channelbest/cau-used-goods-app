@@ -4,21 +4,47 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/go-resty/resty/v2"
 )
 
 type Service struct {
-	apiKey string
-	client *resty.Client
+	apiKey      string
+	endpointURL string
+	model       string
+	client      *resty.Client
 }
 
-func NewService(apiKey string) *Service {
-	return &Service{
-		apiKey: apiKey,
-		client: resty.New(),
+func NewService(apiKey string, baseURL string, model string) *Service {
+	baseURL = strings.TrimSpace(baseURL)
+	if baseURL == "" {
+		baseURL = "https://open.bigmodel.cn/api/paas/v4"
 	}
+	model = strings.TrimSpace(model)
+	if model == "" {
+		model = "glm-4-flash"
+	}
+	return &Service{
+		apiKey:      apiKey,
+		endpointURL: chatCompletionsURL(baseURL),
+		model:       model,
+		client:      resty.New(),
+	}
+}
+
+func chatCompletionsURL(baseURL string) string {
+	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if strings.HasSuffix(baseURL, "/chat/completions") {
+		return baseURL
+	}
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		return baseURL + "/chat/completions"
+	}
+	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/chat/completions"
+	return parsed.String()
 }
 
 type OptimizeRequest struct {
@@ -82,7 +108,7 @@ func (s *Service) OptimizeProduct(ctx context.Context, req OptimizeRequest) (*Op
 `, title, description)
 
 	body := glmRequest{
-		Model: "glm-4-flash",
+		Model: s.model,
 		Messages: []glmMessage{
 			{
 				Role:    "user",
@@ -99,7 +125,7 @@ func (s *Service) OptimizeProduct(ctx context.Context, req OptimizeRequest) (*Op
 		SetHeader("Content-Type", "application/json").
 		SetBody(body).
 		SetResult(&resp).
-		Post("https://open.bigmodel.cn/api/paas/v4/chat/completions")
+		Post(s.endpointURL)
 
 	if err != nil {
 		return nil, fmt.Errorf("request zhipu failed: %w", err)

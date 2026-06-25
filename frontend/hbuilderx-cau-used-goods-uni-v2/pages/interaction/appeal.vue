@@ -5,14 +5,14 @@
     <view class="card">
       <view class="field">
         <text class="field-label">申诉对象</text>
-        <picker :range="targetLabels" :value="targetIndex" @change="selectTargetType">
-          <view class="picker-value">{{ targetTypeLabel }}</view>
+        <picker :range="targetLabels" :value="targetIndex" :disabled="targetLocked" @change="selectTargetType">
+          <view class="picker-value" :class="{ locked: targetLocked }">{{ targetTypeLabel }}</view>
         </picker>
       </view>
 
       <view class="field">
         <text class="field-label">对象 ID</text>
-        <input v-model="form.targetId" class="input" type="number" placeholder="请输入商品、订单、用户或举报 ID" />
+        <input v-model="form.targetId" class="input" :class="{ locked: targetLocked }" :disabled="targetLocked" type="number" placeholder="请输入商品、订单、用户或举报 ID" />
       </view>
 
       <view class="field">
@@ -54,6 +54,7 @@ const targetTypes = [
 const targetLabels = targetTypes.map((item) => item.label)
 const form = reactive({ targetType: 'PRODUCT', targetId: '', reason: '', images: [] })
 const submitting = ref(false)
+const targetLocked = ref(false)
 
 const targetIndex = computed(() => Math.max(0, targetTypes.findIndex((item) => item.value === form.targetType)))
 const targetTypeLabel = computed(() => targetTypes[targetIndex.value]?.label || '商品')
@@ -61,10 +62,12 @@ const targetTypeLabel = computed(() => targetTypes[targetIndex.value]?.label || 
 onLoad((options) => {
   if (options.targetType) form.targetType = String(options.targetType).toUpperCase()
   if (options.targetId) form.targetId = options.targetId
+  targetLocked.value = options.lockTarget === '1' || options.lockTarget === 1
   if (form.targetType === 'USER' && !form.targetId) fillCurrentUserId()
 })
 
 function selectTargetType(event) {
+  if (targetLocked.value) return
   form.targetType = targetTypes[Number(event.detail.value)]?.value || 'PRODUCT'
   if (form.targetType === 'USER' && !form.targetId) fillCurrentUserId()
 }
@@ -119,6 +122,7 @@ async function submit() {
 .field { margin-bottom: 28rpx; }
 .field-label { display: block; margin-bottom: 14rpx; color: #425148; font-size: 27rpx; line-height: 1.5; }
 .picker-value, .input { box-sizing: border-box; min-height: 78rpx; padding: 18rpx 20rpx; border-radius: 14rpx; background: #f7faf8; color: #27352f; font-size: 27rpx; line-height: 1.5; }
+.picker-value.locked, .input.locked { color: #667085; background: #eef2f0; }
 .textarea { box-sizing: border-box; width: 100%; min-height: 220rpx; padding: 18rpx 20rpx; border-radius: 14rpx; background: #f7faf8; color: #27352f; font-size: 27rpx; line-height: 1.6; }
 .images { display: flex; gap: 16rpx; flex-wrap: wrap; }
 .image-wrap { position: relative; }

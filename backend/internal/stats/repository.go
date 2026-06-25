@@ -41,8 +41,9 @@ type StatusDistributionItem struct {
 }
 
 type ProductTrendItem struct {
-	Date  string `json:"date"`
-	Count int    `json:"count"`
+	Date           string `json:"date"`
+	Count          int    `json:"count"`
+	CompletedCount int    `json:"completedCount"`
 }
 
 type OrderOverview struct {
@@ -318,11 +319,15 @@ func (r *Repository) ProductTrend(ctx context.Context, days int) ([]ProductTrend
 	}
 
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT DATE(create_time) AS date, COUNT(*) AS count
+		SELECT
+			DATE(create_time) AS trend_date,
+			COUNT(*) AS publish_count,
+			COALESCE(SUM(CASE WHEN status = 'SOLD' THEN 1 ELSE 0 END), 0) AS completed_count
 		FROM products
-		WHERE create_time >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+		WHERE is_deleted = 0
+		  AND create_time >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
 		GROUP BY DATE(create_time)
-		ORDER BY date ASC
+		ORDER BY trend_date ASC
 	`, days)
 	if err != nil {
 		return nil, err
@@ -332,7 +337,7 @@ func (r *Repository) ProductTrend(ctx context.Context, days int) ([]ProductTrend
 	var list []ProductTrendItem
 	for rows.Next() {
 		var item ProductTrendItem
-		if err := rows.Scan(&item.Date, &item.Count); err != nil {
+		if err := rows.Scan(&item.Date, &item.Count, &item.CompletedCount); err != nil {
 			return nil, err
 		}
 		list = append(list, item)

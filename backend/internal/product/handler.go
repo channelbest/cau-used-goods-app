@@ -511,6 +511,24 @@ func (h *Handler) UpdateProductStatus(c *gin.Context) {
 	})
 }
 
+func (h *Handler) BatchPutOnSaleRestorable(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, response.CodeUnauthorized, "user not login")
+		return
+	}
+
+	count, err := h.service.BatchPutOnSaleRestorable(c.Request.Context(), userID)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, response.CodeBadRequest, err.Error())
+		return
+	}
+
+	response.Success(c, gin.H{
+		"count": count,
+	})
+}
+
 func (h *Handler) AdminUpdateProductStatus(c *gin.Context) {
 	adminID, ok := currentUserID(c)
 	if !ok {

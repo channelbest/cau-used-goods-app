@@ -250,7 +250,8 @@ func writeAppealError(c *gin.Context, err error) {
 		response.Error(c, http.StatusForbidden, response.CodeForbidden, message)
 	case "you already have an active appeal for this target", "appeal already handled":
 		response.Error(c, http.StatusConflict, response.CodeConflict, message)
-	case "appeal must be marked processing before handle", "user appeal target must be restored before approval":
+	case "appeal must be marked processing before handle", "user appeal target must be restored before approval",
+		"report result can only be appealed after handled":
 		response.Error(c, http.StatusConflict, response.CodeConflict, message)
 	case "invalid targetType", "invalid status", "appellantId is required", "targetType must be PRODUCT, USER, ORDER or REPORT",
 		"targetId is required", "reason is required", "reason cannot exceed 500 characters",

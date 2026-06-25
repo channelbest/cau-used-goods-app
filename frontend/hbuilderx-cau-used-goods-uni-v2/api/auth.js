@@ -1,8 +1,4 @@
-import { request } from '../utils/request'
-import { getToken } from '../utils/auth'
-
-const BASE_URL = 'http://62.234.163.176:7001'
-// const BASE_URL = 'http://127.0.0.1:8080'
+import { request, uploadFile } from '../utils/request'
 
 export const devLogin = (payload = {}) => {
   return request({
@@ -71,30 +67,9 @@ export const getStudentVerification = () => {
 }
 
 export const uploadAvatar = (filePath) => {
-  const token = getToken()
-  return new Promise((resolve, reject) => {
-    uni.uploadFile({
-      url: `${BASE_URL}/users/avatar`,
-      filePath,
-      name: 'avatar',
-      header: {
-        Authorization: `Bearer ${token}`
-      },
-      success: (res) => {
-        let body = {}
-        try {
-          body = JSON.parse(res.data || '{}')
-        } catch (error) {
-          reject(new Error('头像上传响应解析失败'))
-          return
-        }
-        if (res.statusCode < 200 || res.statusCode >= 300 || body.code !== 0) {
-          reject(new Error(body.message || '头像上传失败'))
-          return
-        }
-        resolve(body.data)
-      },
-      fail: () => reject(new Error('无法连接服务器，请确认后端服务已启动'))
-    })
+  return uploadFile({
+    url: '/users/avatar',
+    filePath,
+    name: 'avatar'
   })
 }

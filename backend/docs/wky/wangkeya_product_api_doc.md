@@ -367,6 +367,10 @@ curl -X PUT http://127.0.0.1:8080/products/6 ^
 - 是否需要登录：是
 - 权限要求：商品发布者或具备管理权限的用户
 - 功能说明：修改商品状态，例如上架、下架等。
+- 用户端只能在以下场景自行上架：
+  - `off_shelf_by = USER`：用户主动下架。
+  - `off_shelf_by = ACCOUNT_STATUS`：账号禁用/封禁导致系统自动下架，账号恢复后由用户手动确认上架。
+- `off_shelf_by = ADMIN` 或普通 `SYSTEM` 下架的商品，用户不能自行上架，应通过申诉或管理员后续处置处理。
 
 #### 状态值说明
 
@@ -399,6 +403,50 @@ curl -X PUT http://127.0.0.1:8080/products/6/status ^
   }
 }
 ```
+
+### 9.2 批量恢复可自行上架商品
+
+- 请求方式：`POST`
+- 接口路径：`/products/batch-on-sale`
+- 是否需要登录：是
+- 权限要求：商品发布者本人，且账号满足发布/上架条件。
+- 功能说明：一键恢复当前用户可自行上架的下架商品。
+
+批量恢复范围：
+
+```text
+seller_id = 当前用户
+status = OFF_SHELF
+off_shelf_by IN (USER, ACCOUNT_STATUS)
+is_deleted = 0
+```
+
+不会恢复：
+
+- 管理员直接下架的商品：`off_shelf_by = ADMIN`
+- 订单异常、系统风控等普通系统下架商品：`off_shelf_by = SYSTEM`
+- 已删除商品。
+
+返回示例：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "count": 3
+  }
+}
+```
+
+### 9.3 我的商品列表下架来源字段
+
+`GET /products/my` 返回下架商品时会携带：
+
+| 字段 | 说明 |
+|---|---|
+| `offShelfBy` | 下架来源：`USER`、`ADMIN`、`SYSTEM`、`ACCOUNT_STATUS` |
+| `offShelfReason` | 下架原因，前端在“我的商品”中展示 |
 
 ---
 
@@ -801,6 +849,19 @@ curl "http://127.0.0.1:8080/admin/products/7" ^
 - 是否需要登录：是
 - 权限要求：管理员
 - 功能说明：管理员可将商品状态修改为 `ON_SALE`、`OFF_SHELF`、`LOCKED`、`SOLD` 或 `DELETED`。如果处理来源于举报或申诉，可同时传入 `relatedType` 和 `relatedId` 写入管理员日志关联记录。
+- 前端管理员入口在设置 `OFF_SHELF` 时要求填写具体 `reason`，该原因会写入 `products.off_shelf_reason` 并进入系统通知内容。
+- 前端管理员入口在设置 `ON_SALE` 时默认使用 `管理员上架商品` 作为原因。
+
+请求体示例：
+
+```json
+{
+  "status": "OFF_SHELF",
+  "reason": "商品图片与描述不符，存在交易风险",
+  "relatedType": "REPORT",
+  "relatedId": 123
+}
+```
 
 ---
 

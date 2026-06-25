@@ -38,11 +38,19 @@ type Product struct {
 	MeetLocation   string   `json:"meetLocation"`
 	Status         string   `json:"status"`
 	OffShelfBy     *string  `json:"offShelfBy,omitempty"`
+	OffShelfReason *string  `json:"offShelfReason,omitempty"`
 	ViewCount      int      `json:"viewCount"`
 	FavoriteCount  int      `json:"favoriteCount"`
 	CreateTime     string   `json:"createTime"`
 	Images         []string `json:"images"`
 }
+
+const (
+	OffShelfByUser          = "USER"
+	OffShelfByAdmin         = "ADMIN"
+	OffShelfBySystem        = "SYSTEM"
+	OffShelfByAccountStatus = "ACCOUNT_STATUS"
+)
 
 type ProductNoticeInfo struct {
 	ID       uint64
@@ -587,7 +595,7 @@ func (r *Repository) ListProductImages(ctx context.Context, productID uint64) ([
 func (r *Repository) ListMyProducts(ctx context.Context, sellerID uint64) ([]Product, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id, seller_id, category_id, title, description, original_price,
-		       price, condition_level, meet_location, status, off_shelf_by, view_count,
+		       price, condition_level, meet_location, status, off_shelf_by, off_shelf_reason, view_count,
 		       favorite_count, DATE_FORMAT(create_time, '%Y-%m-%d %H:%i:%s')
 		FROM products
 		WHERE seller_id = ? AND is_deleted = 0
@@ -606,10 +614,11 @@ func (r *Repository) ListMyProducts(ctx context.Context, sellerID uint64) ([]Pro
 		var condition sql.NullString
 		var location sql.NullString
 		var offShelfBy sql.NullString
+		var offShelfReason sql.NullString
 
 		if err := rows.Scan(
 			&p.ID, &p.SellerID, &p.CategoryID, &p.Title, &desc, &originalPrice,
-			&p.Price, &condition, &location, &p.Status, &offShelfBy, &p.ViewCount,
+			&p.Price, &condition, &location, &p.Status, &offShelfBy, &offShelfReason, &p.ViewCount,
 			&p.FavoriteCount, &p.CreateTime,
 		); err != nil {
 			return nil, err
@@ -617,6 +626,7 @@ func (r *Repository) ListMyProducts(ctx context.Context, sellerID uint64) ([]Pro
 
 		fillProductNullableFields(&p, desc, originalPrice, condition, location)
 		fillProductOffShelfBy(&p, offShelfBy)
+		fillProductOffShelfReason(&p, offShelfReason)
 
 		images, _ := r.ListProductImages(ctx, p.ID)
 		p.Images = images
@@ -695,7 +705,7 @@ func (r *Repository) UpdateProductStatus(ctx context.Context, productID uint64, 
 		UPDATE products
 		SET status = ?,
 		    off_shelf_reason = CASE WHEN ? = 'OFF_SHELF' THEN ? ELSE NULL END,
-		    off_shelf_by = CASE WHEN ? = 'OFF_SHELF' THEN 'USER' ELSE NULL END,
+		    off_shelf_by = CASE WHEN ? = 'OFF_SHELF' THEN ? ELSE NULL END,
 		    update_time = CURRENT_TIMESTAMP
 		WHERE id = ?
 		  AND seller_id = ?
@@ -703,10 +713,11 @@ func (r *Repository) UpdateProductStatus(ctx context.Context, productID uint64, 
 		  AND (
 		      (? = 'OFF_SHELF' AND status = 'ON_SALE')
 		      OR
-		      (? = 'ON_SALE' AND status = 'OFF_SHELF' AND off_shelf_by = 'USER')
+		      (? = 'ON_SALE' AND status = 'OFF_SHELF' AND UPPER(TRIM(off_shelf_by)) IN (?, ?))
 		  )
 	`,
-		status, status, reason, status, productID, sellerID, status, status,
+		status, status, reason, status, OffShelfByUser, productID, sellerID, status, status,
+		OffShelfByUser, OffShelfByAccountStatus,
 	)
 	if err != nil {
 		return err
@@ -724,10 +735,10 @@ func (r *Repository) UpdateProductStatus(ctx context.Context, productID uint64, 
 				  AND status = 'OFF_SHELF'
 				LIMIT 1
 			`, productID, sellerID).Scan(&offShelfBy)
-			if checkErr == nil && offShelfBy.Valid && offShelfBy.String == "ADMIN" {
+			if checkErr == nil && offShelfBy.Valid && offShelfBy.String == OffShelfByAdmin {
 				return fmt.Errorf("管理员下架的商品不能自行上架")
 			}
-			if checkErr == nil && offShelfBy.Valid && offShelfBy.String == "SYSTEM" {
+			if checkErr == nil && offShelfBy.Valid && offShelfBy.String == OffShelfBySystem {
 				return fmt.Errorf("系统下架的商品不能自行上架")
 			}
 		}
@@ -753,11 +764,11 @@ func (r *Repository) AdminUpdateProductStatusTx(ctx context.Context, tx *sql.Tx,
 		UPDATE products
 		SET status = ?,
 		    off_shelf_reason = CASE WHEN ? = 'OFF_SHELF' THEN ? ELSE NULL END,
-		    off_shelf_by = CASE WHEN ? = 'OFF_SHELF' THEN 'ADMIN' ELSE NULL END,
+		    off_shelf_by = CASE WHEN ? = 'OFF_SHELF' THEN ? ELSE NULL END,
 		    is_deleted = ?,
 		    update_time = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, input.Status, input.Status, input.Reason, input.Status, isDeleted, input.ProductID)
+	`, input.Status, input.Status, input.Reason, input.Status, OffShelfByAdmin, isDeleted, input.ProductID)
 	if err != nil {
 		return fmt.Errorf("update product status: %w", err)
 	}
@@ -776,6 +787,13 @@ type productExecutor interface {
 }
 
 func (r *Repository) OffShelfOnSaleBySellerTx(ctx context.Context, tx *sql.Tx, sellerID uint64, reason string) ([]uint64, error) {
+	return r.OffShelfOnSaleBySellerWithSourceTx(ctx, tx, sellerID, reason, OffShelfBySystem)
+}
+
+func (r *Repository) OffShelfOnSaleBySellerWithSourceTx(ctx context.Context, tx *sql.Tx, sellerID uint64, reason string, source string) ([]uint64, error) {
+	if source == "" {
+		source = OffShelfBySystem
+	}
 	rows, err := tx.QueryContext(ctx, `
 		SELECT id
 		FROM products
@@ -809,16 +827,38 @@ func (r *Repository) OffShelfOnSaleBySellerTx(ctx context.Context, tx *sql.Tx, s
 		UPDATE products
 		SET status = 'OFF_SHELF',
 		    off_shelf_reason = ?,
-		    off_shelf_by = 'SYSTEM',
+		    off_shelf_by = ?,
 		    update_time = CURRENT_TIMESTAMP
 		WHERE seller_id = ?
 		  AND is_deleted = 0
 		  AND status = 'ON_SALE'
-	`, reason, sellerID)
+	`, reason, source, sellerID)
 	if err != nil {
 		return nil, fmt.Errorf("off shelf seller products: %w", err)
 	}
 	return productIDs, nil
+}
+
+func (r *Repository) BatchPutOnSaleRestorable(ctx context.Context, sellerID uint64) (int64, error) {
+	result, err := r.db.ExecContext(ctx, `
+		UPDATE products
+		SET status = 'ON_SALE',
+		    off_shelf_reason = NULL,
+		    off_shelf_by = NULL,
+		    update_time = CURRENT_TIMESTAMP
+		WHERE seller_id = ?
+		  AND is_deleted = 0
+		  AND status = 'OFF_SHELF'
+		  AND UPPER(TRIM(off_shelf_by)) IN (?, ?)
+	`, sellerID, OffShelfByUser, OffShelfByAccountStatus)
+	if err != nil {
+		return 0, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return affected, nil
 }
 
 func (r *Repository) ValidateRelatedRecordTx(ctx context.Context, tx *sql.Tx, relatedType string, relatedID, productID uint64) error {
@@ -1102,6 +1142,12 @@ func fillProductNullableFields(p *Product, desc sql.NullString, originalPrice sq
 func fillProductOffShelfBy(p *Product, offShelfBy sql.NullString) {
 	if offShelfBy.Valid {
 		p.OffShelfBy = &offShelfBy.String
+	}
+}
+
+func fillProductOffShelfReason(p *Product, offShelfReason sql.NullString) {
+	if offShelfReason.Valid {
+		p.OffShelfReason = &offShelfReason.String
 	}
 }
 

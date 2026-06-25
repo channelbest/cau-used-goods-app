@@ -109,6 +109,21 @@ func (r *Repository) TargetAppealableBy(ctx context.Context, appellantID uint64,
 	return count > 0, nil
 }
 
+func (r *Repository) ReportResultAppealable(ctx context.Context, reportID uint64) (bool, error) {
+	var status string
+	if err := r.db.QueryRowContext(ctx, `
+		SELECT status
+		FROM reports
+		WHERE id = ?
+	`, reportID).Scan(&status); err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		return false, fmt.Errorf("check report appeal status: %w", err)
+	}
+	return status == "APPROVED" || status == "REJECTED", nil
+}
+
 func (r *Repository) GetByID(ctx context.Context, id uint64) (*Appeal, error) {
 	query := `
 		SELECT id, appellant_id, target_type, target_id, reason, status,
